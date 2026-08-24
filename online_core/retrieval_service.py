@@ -102,6 +102,10 @@ class RetrievalService:
         if pq.filter:
             must = []
             for k, v in pq.filter.items():
+                if k == "article_no":
+                    # chunk 内含多条文，用 articles 列表 + any 匹配
+                    must.append({"key": "metadata.articles", "match": {"any": v if isinstance(v, list) else [v]}})
+                    continue
                 key = f"metadata.{k}" if k in ("law_name", "article_no", "effect_level", "doc_type") else k
                 if isinstance(v, list):
                     must.append({"key": key, "match": {"any": v}})

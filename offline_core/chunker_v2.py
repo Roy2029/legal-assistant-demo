@@ -398,13 +398,24 @@ class LegalStructureChunker:
     ) -> Chunk:
         cid = "chunk:" + hashlib.sha1(text.encode("utf-8")).hexdigest()[:16]
         meta = dict(metadata_extra or {})
-        m = ARTICLE_CN_RE.search(text)
-        if m:
-            try:
-                from .docx_parser import chinese_to_arabic
-                meta["article_no"] = str(chinese_to_arabic(m.group(1)))
-            except Exception:
-                pass
+        try:
+            from .docx_parser import chinese_to_arabic
+            nums = []
+            for cn in ARTICLE_CN_RE.findall(text):
+                try:
+                    nums.append(str(chinese_to_arabic(cn)))
+                except Exception:
+                    pass
+            # 去重保序
+            seen = []
+            for n in nums:
+                if n not in seen:
+                    seen.append(n)
+            if seen:
+                meta["articles"] = seen
+                meta["article_no"] = seen[0]
+        except Exception:
+            pass
         return Chunk(
             chunk_id=cid,
             doc_id=doc_id,

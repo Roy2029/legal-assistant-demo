@@ -56,7 +56,9 @@ def _find_law_name(query: str) -> Optional[str]:
     if not hits:
         return None
     hits.sort(key=lambda x: (-x[0], x[3]))  # 最长别名优先
-    return hits[0][1]
+    canonical = hits[0][1]
+    # 返回规范全称（元数据中存储的文件名全称）
+    return LAW_ALIASES[canonical][0]
 
 
 def _extract_articles_with_context(query: str):
