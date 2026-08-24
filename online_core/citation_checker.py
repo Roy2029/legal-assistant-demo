@@ -22,7 +22,7 @@ STATUS_VALID = "现行有效"
 
 
 def _cn_to_arabic(cn: str) -> str:
-    from .docx_parser import chinese_to_arabic
+    from offline_core.docx_parser import chinese_to_arabic
     try:
         return str(chinese_to_arabic(cn))
     except Exception:
