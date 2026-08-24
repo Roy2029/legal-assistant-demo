@@ -1,0 +1,103 @@
+{
+  "process_id": "rag_offline_001",
+  "start_time": null,
+  "processed_files": [],
+  "total_chunks": 0,
+  "status": "idle",
+  "retriever": {
+    "default_kb": ""
+  },
+  "logging": {
+    "detailed": true
+  },
+  "rerank": {
+    "default_top_k": 0
+  },
+  "document": {
+    "supported_extensions": [
+      ".pdf",
+      ".doc",
+      ".docx",
+      ".txt",
+      ".md",
+      ".ppt",
+      ".pptx"
+    ],
+    "max_file_size_mb": 50,
+    "encoding": "utf-8"
+  },
+  "chunking": {
+    "method": "semantic",
+    "chunk_size": 512,
+    "chunk_overlap": 50,
+    "min_chunk_size": 100
+  },
+  "vector_db": {
+    "type": "qdrant",
+    "mode": "embedded",
+    "path": "./index_store",
+    "host": "localhost",
+    "port": 6333,
+    "api_key": null,
+    "prefer_grpc": false,
+    "dense": {
+      "embedding_model": "local_model/bge-base-zh",
+      "dimension": 768,
+      "distance": "Cosine",
+      "on_disk": true,
+      "quantization": null,
+      "indexing_threshold": 20000
+    },
+    "sparse": {
+      "enabled": true,
+      "tokenizer": "jieba"
+    },
+    "embedding_model": "local_model/bge-base-zh"
+  },
+  "keyword_db": {
+    "type": "qdrant_sparse",
+    "host": "localhost",
+    "port": 9200,
+    "index_name": "rag_documents"
+  },
+  "output": {
+    "vector_db_path": "./data/vector_db",
+    "keyword_db_path": "data/keyword_db",
+    "metadata_path": "./data/metadata"
+  },
+  "llm": {
+    "deepseek": {
+      "model": "deepseek-v4-flash",
+      "baseurl": "https://api.deepseek.com/v1",
+      "apikey": "DS_API_KEY",
+      "max_input_tokens": 64000,
+      "max_output_tokens": 8192
+    }
+  },
+  "default_set": "deepseek",
+  "index_store_dir": "data/indices",
+  "memory": {
+    "max_messages": 20
+  },
+  "prefilter": {
+    "legal_filter": {
+      "enabled": true,
+      "kw_weight": 0.7,
+      "total_thresh": 0.2,
+      "kb_vocab_path": "index_store/kb_vocab.json"
+    }
+  },
+  "planner_estimator": {
+    "enabled": true,
+    "model_dir": "experiments/planner-utility-estimator/models/",
+    "strategy": "A∪B",
+    "activation_threshold": 0.5
+  },
+  "planner_llm": {
+    "fallback_top_k": 30,
+    "fallback_strategy": "simple",
+    "enable_rewrite": false,
+    "retrieval_mode": "hybrid"
+  },
+  "folder_path": "./documents"
+}

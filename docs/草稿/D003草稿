@@ -1,0 +1,52 @@
+**Q1 框架与循环风格**：主 Agent 用 **LangGraph 状态机 + LLM 原生 function calling**（模型输出 tool_call，由框架执行工具并回填结果），**不做传统 ReAct 的文本 Thought/Action/Observation 解析**。同意吗？（理由：原生 function calling 更稳定、结构化、少一层解析错误）
+
+**Q2 主 Agent 执行模型**：主 Agent 是 **"skill 固定步骤 + 步骤内受控 ReAct"** 的混合体——
+
+- skill 的 `steps` 是确定性流程（先 parse_file 再 retrieve 再 generate），由框架顺序推进；
+- 每步内部允许 LLM 在**有限范围**内自主决定：调用哪个工具、参数怎么填、失败是否重试、是否跳过/降级；
+- 步骤级不自由发挥。 同意吗？
+
+**Q3 工具接口规范**：所有工具（本地工具、MCP 工具、后续子 Agent 工具）统一为：
+
+复制
+
+```
+{
+  tool_id, name, description,
+  params_json_schema,   // 输入 JSON Schema
+  result_schema,        // 输出 JSON Schema
+  provider: local | mcp | agent
+}
+```
+
+同意吗？
+
+**Q4 工具注册表**：本地 `tool_registry` 统一注册；MCP 工具通过一个 **MCP Adapter** 把外部 MCP server 的工具映射为本地工具（你已实现的裁判文书 MCP 就是第一个接入者）。同意吗？
+
+**Q5 流式 SSE 事件类型**：暂定八类——`session_start / step_start / tool_call / tool_result / llm_token / step_end / final / error`。够吗？还需要 `progress`（进度百分比）吗？
+
+**Q6 会话管理**：SQLite `messages` 表（session_id, role, content, token_count, created_at）；支持多会话、切换、删除、重命名；LLM 历史窗口默认**最近 20 条消息**。同意吗？
+
+**Q7 上下文压缩**：当会话历史总 token > 阈值（默认 8,000）时，对**最旧消息做 LLM 摘要**，保留最近 5 条原文；摘要以 `role=system` 注入。同意吗？阈值 8,000 和保留 5 条是否合适？
+
+**Q8 循环防护**：单个业务动作内——最大工具调用轮数 **5**、单次工具调用超时 **60 秒**、用户可随时中断（前端停止按钮 → 取消流）。同意吗？
+
+
+
+
+
+Q1、Q2：我查了资料，你这套选型方案有以下“特点”：“
+
+- **丧失“隐性推理”能力（思维链被迫外露）**：传统ReAct的`Thought`可以自由书写复杂的逻辑推演（比如“我先算A，再比对B，如果C则...否则...”）。但在纯`tool_call`模式下，**复杂的逻辑判断必须在代码的Python逻辑中实现**，模型只负责“填参数”。
+
+- **工具数量激增带来的“上下文污染”**：原生`tool_call`要求将所有工具的Schema完整塞入系统提示词的`tools`字段。当工具超过20-30个时，这些冗长的JSON描述会挤占上下文窗口（Context Window），导致模型注意力分散、对用户意图的**意图识别准确率反而下降**。传统ReAct可以把工具说明写在知识库中按需检索，而原生调用做不到（大部分API强制全量传递）。
+
+- **多步推理的“状态爆炸”**：虽然LangGraph管理状态，但**循环次数完全依赖代码显式定义**（如`recursion_limit`）。如果模型的一次`tool_call`返回结果为空，需要写条件边（Conditional Edge）处理异常；如果多工具结果相互矛盾，需要写合并节点（Reducer）。**这些在传统ReAct中靠“文本观察”就能自适应处理的事，现在全变成了需要你硬编码的逻辑**，开发复杂度向代码层严重倾斜。“
+
+  我不太熟悉法律业务场景下，是更需要灵活性还是固定性，我目前的认识里，是两者都有。你可以在这一点上和我展开聊聊设计思考和决策。
+
+Q3-Q6没问题；
+
+Q7、Q8：窗口8,000上限太小了，主agent和子agent都按 200k来；最大工具调用轮数 50；其他的都没问题。后续可以根据实测的行为特征分布重新调整。
+
+​	

@@ -1,0 +1,84 @@
+# RAG 检索评估实验配置
+# 由 `rag-eval init {{ name }}` 生成
+
+name: "{{ name }}"
+description: ""
+
+# ── 数据集 ────────────────────────────────────────────────────────
+# queries.json: 由 QA_synthesis 生成的查询集
+# qrels.json:   标注的相关 chunk 集合（仅保留 relevance > 0 的条目）
+dataset:
+  queries_path: "data/test_10docs_output/queries.json"
+  qrels_path: "data/test_10docs_output/qrels.json"
+
+# ── 索引 ──────────────────────────────────────────────────────────
+# 指向已建好的 Qdrant 索引数据
+index:
+  path: "./qdrant_data"          # Qdrant 数据目录
+  db_name: "default"              # Collection 名称
+
+# ── Pipeline 基线配置 ────────────────────────────────────────────
+# 各 Run 默认继承此配置，只需在各自的 pipeline 中覆写差异项。
+# 阶段说明:
+#   prefilter: 规则层过滤（零 LLM 开销），检测闲聊/KB 无关
+#   router:    LLM 路由 + 查询改写（同一 LLM 调用）
+#   recall:    多策略召回（始终启用）
+#   rerank:    CrossEncoder 精排（可选）
+#
+# 默认模式 (prefilter=false, router=false): 纯检索评估，零 LLM 开销
+pipeline:
+  prefilter:
+    enabled: false
+  router:
+    enabled: false
+  recall:
+    mode: "hybrid"               # 检索模式: dense | sparse | hybrid
+    top_k: 20                     # 召回阶段返回数
+    fusion: "rrf"                 # Hybrid 融合策略: rrf | dbsf
+  rerank:
+    enabled: false                # 是否启用精排
+    model_path: "local_model/bge-reranker-v2-m3"
+    top_k: 10                     # 精排后保留数
+    device: "cuda"                # 推理设备: cpu | cuda
+    batch_size: 32
+
+# ── 指标配置 ──────────────────────────────────────────────────────
+metrics:
+  ks: [1, 3, 5, 10, 20]          # Recall@k / Precision@k / NDCG@k 的 k 值
+  group_by: ["query_type", "difficulty"]  # 分组统计维度
+
+# ── 参数化 Run ────────────────────────────────────────────────────
+# 每个 Run 是 pipeline 的一种参数化变体。
+# 所有 Run 共享同一数据集和索引，仅在 pipeline 配置上不同。
+# 支持 YAML anchors 消除重复:
+#   runs:
+#     - &dense_base
+#       name: "dense_only"
+#       pipeline: {recall: {mode: dense, top_k: 20}}
+#     - <<: *dense_base
+#       name: "dense_rerank"
+#       pipeline: {rerank: {enabled: true, top_k: 10}}
+runs:
+  - name: "dense_only"
+    description: "纯 dense 检索（基线）"
+    pipeline:
+      recall:
+        mode: "dense"
+        top_k: 20
+
+  - name: "hybrid_only"
+    description: "纯 hybrid 检索"
+    pipeline:
+      recall:
+        mode: "hybrid"
+        top_k: 20
+
+  - name: "hybrid_rerank"
+    description: "Hybrid + CrossEncoder 精排"
+    pipeline:
+      recall:
+        mode: "hybrid"
+        top_k: 20
+      rerank:
+        enabled: true
+        top_k: 10

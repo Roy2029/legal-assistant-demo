@@ -1,0 +1,28 @@
+# venv
+.venv/
+
+# 数据与索引（大文件，不入库）
+data/indices/
+data/uploads/
+data/parsed/
+data/logs/
+data/sqlite.db
+data/config.json
+data/anonymization/
+data/keys/
+data/reports/
+qa_cache/
+
+# 模型（本地大文件）
+local_model/
+models/
+
+# 外部资产索引（不随仓库分发）
+QA_dataset/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# 凭据
+.env
+*.cookies.json

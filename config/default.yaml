@@ -1,0 +1,109 @@
+# 默认配置文件
+
+# 文档处理配置
+document:
+  supported_extensions: ['.pdf', '.doc', '.docx', '.txt', '.md', '.ppt', '.pptx']
+  max_file_size_mb: 50
+  encoding: 'utf-8'
+
+# 文本切分配置
+chunking:
+  method: 'semantic'  # semantic, fixed, recursive
+  chunk_size: 512
+  chunk_overlap: 50
+  min_chunk_size: 100
+
+# 向量数据库配置
+vector_db:
+  type: 'qdrant'                        # qdrant（推荐）/ faiss（已废弃）
+  mode: 'embedded'                      # embedded（本地磁盘持久化）/ server（Docker/远程服务）
+  # 嵌入式模式
+  path: './index_store'                 # 嵌入式存储根目录
+  # 服务式模式（mode: server 时生效）
+  host: 'localhost'
+  port: 6333
+  api_key: null
+  # 加密
+  prefer_grpc: false
+  # Dense 向量配置
+  dense:
+    embedding_model: 'local_model/bge-base-zh'
+    dimension: 768
+    distance: 'Cosine'
+    on_disk: true
+    quantization: null                  # scalar / product / binary / null
+    indexing_threshold: 20000           # 超过此数量自动建 HNSW 索引
+  # Sparse 向量配置（BM25）
+  sparse:
+    enabled: true
+    tokenizer: 'jieba'
+
+# 关键词数据库配置（已废弃，BM25 由 vector_db.sparse 统一管理）
+keyword_db:
+  type: 'qdrant_sparse'
+  host: 'localhost'
+  port: 9200
+  index_name: 'rag_documents'
+
+# 输出配置
+output:
+  vector_db_path: 'data/vector_db'
+  keyword_db_path: 'data/keyword_db'
+  metadata_path: 'data/metadata'
+
+# LLM 配置
+llm:
+  deepseek:
+    model: "deepseek-v4-flash"
+    baseurl: "https://api.deepseek.com/v1"
+    apikey: "DS_API_KEY"
+    max_input_tokens: 64000
+    max_output_tokens: 8192
+
+# 默认使用的 LLM 配置组
+default_set: "deepseek"
+
+# 检索配置
+retriever:
+  top_k: 5
+  mode: "hybrid"
+
+# 索引存储根目录（/select_db 时从此目录下列出可用知识库）
+index_store_dir: "data/indices"
+
+# 会话/记忆配置
+memory:
+  max_messages: 20
+
+# 重排配置（cross-encoder rerank）
+rerank:
+  enabled: false
+  model: "local_model/bge-reranker-v2-m3"
+  device: "cuda"
+
+# 预过滤器配置（LegalPreFilter）
+prefilter:
+  legal_filter:
+    enabled: true
+    kw_weight: 0.70
+    total_thresh: 0.20
+    kb_vocab_path: "index_store/kb_vocab.json"
+
+# PlannerEstimator 配置（ML 驱动的 PlannerLLM 激活判定）
+planner_estimator:
+  enabled: true
+  model_dir: "experiments/planner-utility-estimator/models/"
+  strategy: "A∪B"
+  activation_threshold: 0.5
+
+# PlannerLLM 配置（短路到 retriever 时的默认参数）
+planner_llm:
+  fallback_top_k: 30
+  fallback_strategy: "simple"
+  enable_rewrite: false
+  retrieval_mode: "hybrid"
+
+# 日志配置
+logging:
+  level: 'INFO'
+  file: 'logs/offline_process.log'

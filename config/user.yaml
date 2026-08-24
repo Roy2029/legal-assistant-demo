@@ -1,0 +1,14 @@
+# 用户自定义配置文件（覆盖默认配置）
+# 在此文件中修改配置以适应您的需求
+
+# 文档文件夹路径（请根据实际情况修改）
+folder_path: './documents'
+
+# 向量数据库输出路径
+output:
+  vector_db_path: './data/vector_db'
+  metadata_path: './data/metadata'
+
+# 嵌入模型配置（可选更强大的模型）
+vector_db:
+  embedding_model: 'local_model/bge-base-zh'
