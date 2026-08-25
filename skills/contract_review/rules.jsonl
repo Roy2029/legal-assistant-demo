@@ -1,0 +1,1 @@
+{"rule_id": "cr-example-001", "dimension": "结算支付", "trigger": {"patterns": ["逾期审核", "视为认可", "送审价"]}, "risk_level": "high", "risk_desc": "示例：逾期审核视为认可送审价对甲方极为不利（待法务朋友核验）", "suggestion_template": "删除'逾期视为认可'表述，改为'以双方书面确认为准'", "basis": [{"law": "建工司法解释一", "article": "待核验"}], "source": "示例占位", "status": "disabled"}
