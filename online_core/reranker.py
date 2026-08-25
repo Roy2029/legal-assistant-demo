@@ -25,7 +25,7 @@ class CrossEncoderReranker:
         model_path: str = "local_model/bge-reranker-v2-m3",
         device: str = "cuda",
         batch_size: int = 32,
-        use_fp16: bool = True,
+        use_fp16: bool = False,  # GTX 1650 上 .half() 有严重性能 bug（580s/批），FP32 反而快
     ):
         """
         Args:

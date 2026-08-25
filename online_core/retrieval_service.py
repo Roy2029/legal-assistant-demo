@@ -28,7 +28,7 @@ class RetrievalConfig:
     embedding_model: str = DEFAULT_EMBEDDING
     reranker_model: str = DEFAULT_RERANKER
     device: str = "cuda"
-    enable_rerank: bool = False  # M0 默认关闭：GTX 1650 上 reranker 极慢（FP16/OOM 回退），M2 再优化
+    enable_rerank: bool = False  # M0 关闭：4GB 显卡可用显存不足且 CPU 长文本 rerank 过慢；M2 量化/裁剪候选后重开
     recall_top_k: int = 50
 
 
@@ -51,11 +51,8 @@ class RetrievalService:
 
     def _get_embedding(self):
         if self._embedding is None:
-            import torch
-            device = self.config.device
-            if device == "cuda" and not torch.cuda.is_available():
-                device = "cpu"
-            self._embedding = HuggingFaceEmbeddingModel(model_name=self.config.embedding_model, device=device)
+            # embedding 放 CPU：编码单条 query <1s；GPU 留给 reranker（两模型同占 GPU 会显存争抢卡死）
+            self._embedding = HuggingFaceEmbeddingModel(model_name=self.config.embedding_model, device="cpu")
         return self._embedding
 
     def _get_store(self):
@@ -80,14 +77,8 @@ class RetrievalService:
     def _get_reranker(self):
         if self._reranker is None and self.config.enable_rerank:
             from online_core.reranker import CrossEncoderReranker
-            import torch
-            device = self.config.device
-            if device == "cuda" and not torch.cuda.is_available():
-                device = "cpu"
-            try:
-                self._reranker = CrossEncoderReranker(model_path=self.config.reranker_model, device=device, use_fp16=True)
-            except Exception:
-                self._reranker = CrossEncoderReranker(model_path=self.config.reranker_model, device="cpu", use_fp16=True)
+            # GTX 1650 4GB 实测可用显存仅约 1.2GB，FP32 reranker 放不下；CPU 30 对约 10s 可接受
+            self._reranker = CrossEncoderReranker(model_path=self.config.reranker_model, device="cpu", use_fp16=False)
         return self._reranker
 
     def search(self, query: str) -> RetrievalOutput:
