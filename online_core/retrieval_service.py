@@ -28,7 +28,7 @@ class RetrievalConfig:
     embedding_model: str = DEFAULT_EMBEDDING
     reranker_model: str = DEFAULT_RERANKER
     device: str = "cuda"
-    enable_rerank: bool = True
+    enable_rerank: bool = False  # M0 默认关闭：GTX 1650 上 reranker 极慢（FP16/OOM 回退），M2 再优化
     recall_top_k: int = 50
 
 
@@ -119,15 +119,17 @@ class RetrievalService:
         method = self._get_method()
         top_k = self.config.recall_top_k
         raw = method.search(query, top_k=top_k, filters=filters)
-        # 6. rerank
+        # 6. rerank（exact_match 跳过精排：精确法条号查询候选已高度相关，且 rerank 在低显存机器极慢）
         results = raw
-        if self.config.enable_rerank:
+        if self.config.enable_rerank and not pq.exact_match:
             try:
                 reranker = self._get_reranker()
                 if reranker is not None:
-                    results = reranker.rerank(query, raw, top_k=diff["top_k"])
+                    results = reranker.rerank(query, raw[:30], top_k=diff["top_k"])
             except Exception:
                 results = raw[: diff["top_k"]]
+        else:
+            results = raw[: diff["top_k"]]
         # 7. 父子召回：命中 child → 返回 parent（M0：service 层标记，上层决定取 parent 文本）
         trace = {
             "parsed": {
