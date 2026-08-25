@@ -30,3 +30,8 @@ __pycache__/
 # frontend
 frontend/node_modules/
 frontend/dist/
+
+# 测试与评估产物
+data/test_upload.*
+data/eval_reports/
+data/rerank_test*.log
