@@ -23,7 +23,7 @@ DEFAULT_RERANKER = str(RAG1_ROOT / "local_model/bge-reranker-v2-m3")
 
 @dataclass
 class RetrievalConfig:
-    index_path: str = str(RAG1_ROOT / "data/indices/法律/qdrant")
+    index_path: str = str(Path("D:/个人/legal-assistant-demo/data/indices/法律/qdrant"))
     collection: str = "chunks"
     embedding_model: str = DEFAULT_EMBEDDING
     reranker_model: str = DEFAULT_RERANKER

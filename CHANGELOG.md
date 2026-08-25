@@ -2,6 +2,13 @@
 
 ## [Unreleased] - M0 能跑 开发中
 
+## W5 关闭 - 实务助手框架（2026-08-26）
+- Skill 注册表：skills/*/SKILL.md（4 个业务动作：案例检索/案情分析/合同审查/法律研究备忘录）
+- /api/actions + /api/assistant SSE（step_start/tool_call/tool_result/final）
+- 工具调度：kb_retrieval（真实检索）+ case_retrieval（离线库空态提示，不编造）
+- 修复：get_retrieval_service 默认指向 RAG1.0 旧索引导致 law_name 为空
+- 测试：3/3 通过
+
 ## W4 关闭 - 用户知识库（2026-08-26）
 - /api/kb/upload：md/txt/docx 解析入库（python-docx/MarkdownParser/pypdf），corpus=user 元数据隔离
 - /api/kb/docs 列表 + DELETE 删除（同步删向量与文件）

@@ -9,6 +9,7 @@ from .config_service import config_service
 from .chat_api import router as chat_router
 from .lexicon_api import router as lexicon_router
 from .kb_api import router as kb_router
+from .assistant_api import router as assistant_router
 
 app = FastAPI(title="法律助手 Demo", version="0.1.0")
 
@@ -23,6 +24,7 @@ app.middleware("http")(audit_middleware)
 app.include_router(chat_router)
 app.include_router(lexicon_router)
 app.include_router(kb_router)
+app.include_router(assistant_router)
 register_error_handlers(app)
 
 

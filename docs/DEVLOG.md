@@ -31,6 +31,12 @@
 
 ## 阶段简报
 
+### W5 关闭 - 实务助手框架（2026-08-26）
+- 完成：skill 注册表（SKILL.md frontmatter 解析）、4 个业务动作桩、/api/assistant SSE 工具调度、kb_retrieval/case_retrieval 工具
+- 测试：3/3 通过（actions/assistant_stream/unknown_action）
+- 经验：① get_retrieval_service() 默认配置必须指向 demo 新索引（曾指向 RAG1.0 旧索引导致 law_name 空）；② M0 案例检索返回空态提示，绝不编造案例
+
+
 ### W4 关闭 - 用户知识库（2026-08-26）
 - 完成：上传/列表/删除 API、md/txt/docx 解析入库、corpus=user + user_id 元数据隔离、检索 corpus_scope、复用单例 QdrantStore 避免锁冲突
 - 测试：pytest 1 passed（上传→列表→scope=user 检索命中→删除→不命中）；txt/docx 实测上传成功
