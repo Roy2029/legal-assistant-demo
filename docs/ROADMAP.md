@@ -42,7 +42,7 @@ M0 能跑（6周）   M1 能用（5周）   M2 可控（5周）   M3 好用（5�
 |----|--------|----------|------|
 | W1 | 资产整合 + Gap 分析 | T1.1 仓库骨架；T1.2 迁入 offline/online/evaluation 基线；T1.3 修 kb_vocab 路径、SearchQuery bug、manifest 空壳；T1.4 索引资产接入；T1.5 模型资产接入；T1.6 索引 Gap 分析；T1.7 FastAPI 骨架；T1.8 SQLite 初始化；T1.9 启动器骨架；T1.10 收集 3-5 份脱敏合同 | 基线在 demo 仓库可检索；Gap 决策明确 |
 | W2 | 检索服务适配 | Query 解析器（法条号/法规名/效力级别+否定排除）；HybridMethod 封装 + reranker + 难度分档；词典服务；索引重建 | 精确法条号检索命中；引用校验通过；qrels 评估跳过（新 qrels 由用户后续重建） |
-| W3 | 知识库问答闭环 | OnlineEngine 适配（Router 关、Prefilter 保守）；引用校验器（打回 1 次+追加风险提示）；SSE /api/chat；问答 UI + Trace 双视图 | 200 条问答引用可验证率 100%；trace 完整可见 |
+| W3 | 知识库问答闭环 | OnlineEngine 适配（Router 关、Prefilter 保守）；引用校验器（打回 1 次+追加风险提示）；SSE /api/chat；问答 UI + Trace 双视图；**Trace 展示 dense/BM25 分别召回 chunk 列表与 BM25 分词（用户反馈新增）** | 200 条问答引用可验证率 100%（通过/失效/未验证提示）；trace 完整可见（含中间 chunk 与分词） |
 | W4 | 用户知识库 | python-docx/Markitdown 解析降级链 + StructureAwareChunker 分块 + 同 collection 入库 + 元数据隔离；自定义关键词前端 | md/docx/pdf/txt 可检索；隔离生效；词典即时生效 |
 | W5 | 实务助手框架 | LangGraph 主 Agent（think 分级+隐式结束）；skill 注册表（SKILL.md）；4 个顶级工具（普通工具调用）；4 个业务动作桩；案例离线库 + MCP 可选适配 | 动作→调度→trace 走通；离线案例可返回 |
 | W6 | 打磨与交付 | 规则脱敏（可逆假名化）；设置页热更新；增量更新服务（rebuild_full 后）；Inno Setup 安装包；演示脚本；虚拟机验收 | 全新机器开箱即用；断网可用；更新检查正常 |

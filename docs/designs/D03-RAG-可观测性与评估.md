@@ -94,7 +94,7 @@
 | 视图 | 内容 |
 |------|------|
 | 精简视图（默认） | 步骤卡片时间线（PreFilter→解析→检索→难度→rerank→召回→生成→校验），每步一句话结果；引用卡片可点击定位原文 |
-| 技术视图（展开） | chunk_id、BM25/dense/RRF/rerank 分数、filter JSON、难度命中规则、token 分布、截断标记 |
+| 技术视图（展开） | **dense/BM25 各自召回 chunk 列表**（chunk_id、得分、文本摘要，可折叠展开全文）、RRF 融合、rerank 分数、filter JSON、难度命中规则、**BM25 对 query 的分词结果（标记命中的用户自定义词典词）**、token 分布、截断标记 |
 
 ---
 
