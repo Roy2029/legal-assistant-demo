@@ -286,6 +286,49 @@ function AssistantPage() {
   )
 }
 
+function KbPage() {
+  const [docs, setDocs] = useState([])
+  const [uploading, setUploading] = useState(false)
+
+  function loadDocs() {
+    fetch('/api/kb/docs').then((r) => r.json()).then((d) => setDocs(d.data || []))
+  }
+  useEffect(() => { loadDocs() }, [])
+
+  async function upload(file) {
+    setUploading(true)
+    const fd = new FormData()
+    fd.append('file', file)
+    const r = await fetch('/api/kb/upload', { method: 'POST', body: fd })
+    const d = await r.json()
+    if (d.ok) { message.success(`已上传：${d.data.name}（${d.data.children} chunks）`) } else { message.error(d.error?.message || '上传失败') }
+    setUploading(false)
+    loadDocs()
+  }
+
+  async function remove(docId) {
+    await fetch('/api/kb/docs/' + docId, { method: 'DELETE' })
+    message.success('已删除')
+    loadDocs()
+  }
+
+  return (
+    <Card title="知识库管理" size="small">
+      <Space direction="vertical" style={{ width: '100%' }}>
+        <input type="file" accept=".md,.txt,.docx,.pdf" onChange={(e) => { if (e.target.files[0]) upload(e.target.files[0]) }} disabled={uploading} />
+        <Text type="secondary">支持 md / txt / docx / pdf（扫描件暂不支持）</Text>
+        <List size="small" dataSource={docs} renderItem={(d) => (
+          <List.Item actions={[<Button size="small" danger onClick={() => remove(d.doc_id)}>删除</Button>]}>
+            <Text>{d.file_path?.replace(/.*[\/]/, '')}</Text>
+            <Tag>{d.parse_status}</Tag>
+            <Text type="secondary">{d.chunk_count} chunks</Text>
+          </List.Item>
+        )} />
+      </Space>
+    </Card>
+  )
+}
+
 function Placeholder({ title }) {
   return <Card><Text type="secondary">{title}（开发中）</Text></Card>
 }
@@ -297,7 +340,7 @@ export default function App() {
       <Tabs defaultActiveKey="chat" items={[
         { key: 'chat', label: '知识库问答', children: <ChatPage /> },
         { key: 'assistant', label: '实务助手', children: <AssistantPage /> },
-        { key: 'kb', label: '知识库管理', children: <Placeholder title="知识库管理" /> },
+        { key: 'kb', label: '知识库管理', children: <KbPage /> },
         { key: 'settings', label: '设置', children: <SettingsPage /> },
       ]} />
     </div>

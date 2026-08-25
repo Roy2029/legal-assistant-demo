@@ -128,8 +128,27 @@ async def event_gen(query: str, session_id: str):
         return
 
     # 2. 生成（首次）
+    # 2. 生成（首次）：注入会话历史（M1 会话管理，含上下文压缩）
+    history_messages = []
+    try:
+        from .db import get_engine
+        import sqlalchemy as sa
+        engine = get_engine()
+        with engine.begin() as conn:
+            rows = conn.execute(
+                sa.text("SELECT role, content FROM messages WHERE session_id=:s AND role IN ('user','assistant') AND msg_kind='final' ORDER BY id DESC LIMIT 20"),
+                {"s": session_id},
+            ).fetchall()
+        engine.dispose()
+        for role, content in reversed(rows):
+            history_messages.append({"role": role, "content": content})
+    except Exception:
+        pass
+    from .context_compressor import compress_history
+    history_messages = compress_history(history_messages)
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
+        *history_messages,
         {"role": "user", "content": f"问题：{masked_query}\n\n检索资料：\n{masked_context}"},
     ]
     answer = ""
