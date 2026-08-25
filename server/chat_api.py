@@ -163,6 +163,18 @@ async def event_gen(query: str, session_id: str):
         yield f"data: {json.dumps({'type': 'citation_check', 'unverifiable': [c.raw for c in result.unverifiable]}, ensure_ascii=False)}\n\n"
 
     final = restore(answer + suffix) + DISCLAIMER
+
+    # 持久化本轮消息（M1 会话管理）
+    try:
+        from .db import get_engine
+        import sqlalchemy as sa
+        engine = get_engine()
+        with engine.begin() as conn:
+            conn.execute(sa.text("INSERT INTO messages (session_id, role, msg_kind, content) VALUES (:s, 'user', 'user', :q)"), {"s": session_id, "q": query})
+            conn.execute(sa.text("INSERT INTO messages (session_id, role, msg_kind, content) VALUES (:s, 'assistant', 'final', :a)"), {"s": session_id, "a": final})
+        engine.dispose()
+    except Exception:
+        pass
     yield f"data: {json.dumps({'type': 'final', 'answer': final}, ensure_ascii=False)}\n\n"
     yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
 
