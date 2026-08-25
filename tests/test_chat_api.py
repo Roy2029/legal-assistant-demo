@@ -16,8 +16,13 @@ def test_health():
 def test_config_get_put():
     r = client.get("/api/config")
     assert r.status_code == 200 and r.json()["ok"]
+    # PUT 测试后立即清理，避免污染 .env 真实配置
     r = client.put("/api/config", json={"llm": {"base_url": "https://example.com/v1", "api_key": "test", "model": "test-model"}})
     assert r.status_code == 200 and r.json()["ok"]
+    from pathlib import Path
+    Path("D:/个人/legal-assistant-demo/data/config.json").unlink(missing_ok=True)
+    from server.config_service import config_service
+    config_service._cache = None
     print("PASS config_get_put")
 
 def test_chat_empty_query():
