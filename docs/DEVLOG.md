@@ -21,7 +21,13 @@
 
 ## 阶段简报
 
-（每个阶段关闭后追加）
+### W2 关闭 - 检索服务适配（2026-08-25）
+- **完成**：chunker_v2（D01 目标策略）、query_parser、difficulty、lexicon_service、retrieval_service、rebuild_index_v2（GPU）、citation_checker（部分 W3）
+- **索引重建**：451 份法规 → 4,052 parents / 18,058 children / 22,110 向量（Qdrant embedded，221MB）
+- **测试**：单元测试 14 项 + 集成测试 3 项全部通过（精确法条号、语义检索、引用校验）
+- **评估口径变更**：旧 qrels 跳过，M0 改人工抽检；新 qrels 由用户后续重建
+- **经验**：① 长任务一律 nohup 后台 + 日志轮询，前台跑会超时；② 脚本加 `python -u` 保证日志实时；③ 嵌入 GPU batch 64 比 16 快数倍
+
 
 ## 开发进度快照
 

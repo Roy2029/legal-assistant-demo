@@ -43,6 +43,12 @@ def get_config():
     return {"ok": True, "data": config_service.load()}
 
 
+@app.put("/api/config")
+def put_config(payload: dict):
+    config_service.update(payload)
+    return {"ok": True, "data": config_service.load()}
+
+
 if __name__ == "__main__":
     import uvicorn
 
