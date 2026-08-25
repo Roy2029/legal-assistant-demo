@@ -20,6 +20,8 @@
 
 ## 踩坑记录
 
+7. **reranker 在 GTX 1650 上的三重坑**：① `.half()` FP16 转换后 predict 极慢（580s/批）；② FP32 模型 2166MB + 系统占用导致 4GB 显存实际可用仅 ~1.2GB，GPU 放不下；③ CPU rerank 长文本 30 对远超短文本 benchmark。M0 关闭 rerank，M2 再优化（量化/候选裁剪/换机）。
+
 1. **transformers 5.x 与 sentence-transformers 5.5 不兼容** → 降级 transformers<5；demo 用 .venv 隔离。
 2. **Qdrant 本地嵌入式不支持 payload index** → 仅 server 模式生效；交付版用 server 子进程。
 3. **chunker 递归切分死循环** → _split_by_candidates 切不动时需直接硬切 + 递归深度保护。
