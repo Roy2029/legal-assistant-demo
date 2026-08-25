@@ -208,6 +208,84 @@ function SettingsPage() {
   )
 }
 
+function AssistantPage() {
+  const [actions, setActions] = useState([])
+  const [action, setAction] = useState(null)
+  const [input, setInput] = useState('')
+  const [steps, setSteps] = useState([])
+  const [finalText, setFinalText] = useState('')
+  const [running, setRunning] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/actions').then((r) => r.json()).then((d) => setActions(d.data || []))
+  }, [])
+
+  async function run() {
+    if (!action || !input.trim() || running) return
+    setSteps([]); setFinalText(''); setRunning(true)
+    const resp = await fetch('/api/assistant', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: action.skill_id, query: input.trim() }),
+    })
+    const reader = resp.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      const lines = buf.split('\n\n')
+      buf = lines.pop() || ''
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue
+        try {
+          const evt = JSON.parse(line.slice(5).trim())
+          if (evt.type === 'step_start') setSteps((s) => [...s, { step: evt.step, status: 'running' }])
+          else if (evt.type === 'tool_call') setSteps((s) => [...s, { tool: evt.tool, params: evt.params, status: 'tool' }])
+          else if (evt.type === 'tool_result') setSteps((s) => [...s, { summary: evt.summary, status: 'done' }])
+          else if (evt.type === 'step_end') setSteps((s) => [...s, { step: evt.step + ' 完成', summary: evt.summary, status: 'done' }])
+          else if (evt.type === 'final') setFinalText(evt.answer)
+          else if (evt.type === 'error') setFinalText('⚠️ ' + evt.message)
+        } catch {}
+      }
+    }
+    setRunning(false)
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: 16 }}>
+      <Card style={{ width: 360 }} title="业务动作" size="small">
+        <Space direction="vertical" style={{ width: '100%' }}>
+          {actions.map((a) => (
+            <Card key={a.skill_id} size="small" hoverable onClick={() => setAction(a)}
+              style={{ border: action?.skill_id === a.skill_id ? '1px solid #1677ff' : undefined }}>
+              <Text strong>{a.name}</Text>
+              <div><Text type="secondary" style={{ fontSize: 12 }}>{a.description}</Text></div>
+            </Card>
+          ))}
+        </Space>
+      </Card>
+      <Card style={{ flex: 1 }} title="执行" size="small">
+        {!action && <Text type="secondary">请先选择左侧业务动作</Text>}
+        {action && (
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <Input.TextArea value={input} onChange={(e) => setInput(e.target.value)} placeholder="描述你的需求" autoSize={{ minRows: 2, maxRows: 5 }} />
+            <Button type="primary" onClick={run} loading={running}>{running ? '执行中...' : '执行'}</Button>
+            {steps.length > 0 && (
+              <List size="small" dataSource={steps} renderItem={(s, i) => (
+                <List.Item>
+                  <Tag color={s.status === 'done' ? 'green' : 'blue'}>{(s.step || s.tool || '') + (s.summary ? '：' + s.summary : '')}</Tag>
+                </List.Item>
+              )} />
+            )}
+            {finalText && <Paragraph style={{ whiteSpace: 'pre-wrap', background: '#f6ffed', padding: 12, borderRadius: 8 }}>{finalText}</Paragraph>}
+          </Space>
+        )}
+      </Card>
+    </div>
+  )
+}
+
 function Placeholder({ title }) {
   return <Card><Text type="secondary">{title}（开发中）</Text></Card>
 }
@@ -218,7 +296,7 @@ export default function App() {
       <Typography.Title level={3} style={{ marginBottom: 16 }}>法律助手 Demo</Typography.Title>
       <Tabs defaultActiveKey="chat" items={[
         { key: 'chat', label: '知识库问答', children: <ChatPage /> },
-        { key: 'assistant', label: '实务助手', children: <Placeholder title="实务助手" /> },
+        { key: 'assistant', label: '实务助手', children: <AssistantPage /> },
         { key: 'kb', label: '知识库管理', children: <Placeholder title="知识库管理" /> },
         { key: 'settings', label: '设置', children: <SettingsPage /> },
       ]} />
