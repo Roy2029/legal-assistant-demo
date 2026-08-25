@@ -6,12 +6,34 @@ from typing import Any, Optional
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = PROJECT_ROOT / "data" / "config.json"
+ENV_PATH = PROJECT_ROOT / ".env"
 
-DEFAULT_CONFIG: dict[str, Any] = {
-    "llm": {"base_url": "", "api_key": "", "model": ""},
-    "desensitize": {"enabled": True, "level": "standard"},
-    "retrieval": {"top_k": 8, "recall_top_k": 50},
-}
+
+def _load_env_llm() -> dict[str, str]:
+    """从项目根 .env 读取 LLM 配置（LLM_API_KEY / LLM_BASE_URL / LLM_MODEL）。"""
+    env = {}
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(ENV_PATH)
+        import os
+        env["api_key"] = os.getenv("LLM_API_KEY", "") or ""
+        env["base_url"] = os.getenv("LLM_BASE_URL", "") or ""
+        env["model"] = os.getenv("LLM_MODEL", "") or ""
+    except Exception:
+        pass
+    return env
+
+
+def _default_config() -> dict[str, Any]:
+    llm_env = _load_env_llm()
+    # DeepSeek 默认 model
+    if llm_env.get("base_url") and not llm_env.get("model"):
+        llm_env["model"] = "deepseek-chat"
+    return {
+        "llm": llm_env,
+        "desensitize": {"enabled": True, "level": "standard"},
+        "retrieval": {"top_k": 8, "recall_top_k": 50},
+    }
 
 class ConfigService:
     def __init__(self) -> None:
@@ -22,7 +44,7 @@ class ConfigService:
         with self._lock:
             if self._cache is not None:
                 return self._cache
-            cfg = dict(DEFAULT_CONFIG)
+            cfg = _default_config()
             if CONFIG_PATH.exists():
                 try:
                     loaded = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))

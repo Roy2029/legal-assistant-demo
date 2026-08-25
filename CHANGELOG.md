@@ -2,6 +2,14 @@
 
 ## [Unreleased] - M0 能跑 开发中
 
+### Added (W3)
+- /api/chat SSE 流式问答（retrieval→generation→citation_check→final）
+- 引用校验器（打回 1 次 + 追加未验证提示；真实法条/虚构法条测试通过）
+- LLM 客户端（OpenAI 兼容，.env 读取 LLM_API_KEY/LLM_BASE_URL）
+- React 前端骨架：知识库问答（流式 + Trace 面板）、设置页（LLM 热更新 + 词典管理）
+- 一键启动脚本 scripts/start_all.bat / start_all.py / stop_all.bat
+- 真实 LLM 链路冒烟验证通过（民法典第580条 → 回答+引用+免责声明）
+
 ## W2 关闭 - 检索服务适配（2026-08-25）
 - 索引重建完成：451 份法规，4,052 parents / 18,058 children（chunker_v2 目标策略）
 - 精确法条号检索验证通过（民法典第580条命中 3 条含 580 的 chunk）
