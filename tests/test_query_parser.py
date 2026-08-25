@@ -9,9 +9,9 @@ from online_core.query_parser import parse_query
 def test_exact_article():
     q = parse_query("民法典第580条说了什么")
     assert q.exact_match is True
-    assert q.law_name == "民法典"
+    assert q.law_name == "中华人民共和国民法典"
     assert q.article_no == "580"
-    assert q.filter["law_name"] == "民法典"
+    assert q.filter["law_name"] == "中华人民共和国民法典"
     assert q.filter["article_no"] == "580"
     print("PASS exact_article")
 

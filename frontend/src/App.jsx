@@ -4,6 +4,16 @@ import { SendOutlined, StopOutlined } from '@ant-design/icons'
 
 const { Text, Paragraph } = Typography
 
+function ChunkList({ items }) {
+  return (
+    <Collapse size="small" items={(items || []).map((c, i) => ({
+      key: String(i),
+      label: <span style={{ fontSize: 12 }}>#{i + 1} score={c.score} {c.chunk_id?.slice(0, 18)}</span>,
+      children: <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap', maxHeight: 200, overflow: 'auto' }}>{c.text}</pre>,
+    }))} />
+  )
+}
+
 function ChatPage() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -113,11 +123,24 @@ function ChatPage() {
       <Card style={{ width: 420, overflow: 'auto' }} title="检索过程（Trace）" size="small">
         {!trace && <Text type="secondary">发送问题后展示检索过程</Text>}
         {trace && (
-          <Collapse size="small" items={[
+          <Collapse size="small" defaultActiveKey={['parsed']} items={[
             { key: 'parsed', label: 'Query 解析', children: <pre style={{ fontSize: 12 }}>{JSON.stringify(trace.parsed, null, 2)}</pre> },
             { key: 'difficulty', label: '难度分档', children: <pre style={{ fontSize: 12 }}>{JSON.stringify(trace.difficulty, null, 2)}</pre> },
-            { key: 'retrieval', label: `检索（rrf ${trace.rrf_raw_count} → rerank 后 ${trace.final_count}）`, children: <Text type="secondary">详细 chunk 分数将在 W3 后续版本展示</Text> },
-          ]} defaultActiveKey={['parsed']} />
+            { key: 'bm25_tokens', label: 'BM25 查询分词', children: (
+                <div>
+                  {(trace.bm25_tokens || []).map((t, i) => <Tag key={i} style={{ marginBottom: 4 }}>{t}</Tag>)}
+                  <Text type="secondary" style={{ display: 'block', marginTop: 4, fontSize: 12 }}>自定义关键词生效：分词中包含完整词条即生效</Text>
+                </div>
+              ) },
+            {
+              key: 'dense', label: `Dense 召回（${(trace.dense_topk || []).length}）`,
+              children: <ChunkList items={trace.dense_topk || []} />,
+            },
+            {
+              key: 'bm25', label: `BM25 召回（${(trace.bm25_topk || []).length}）`,
+              children: <ChunkList items={trace.bm25_topk || []} />,
+            },
+          ]} />
         )}
         {citations && citations.unverifiable && (
           <Paragraph style={{ marginTop: 12 }} type="warning">

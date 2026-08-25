@@ -102,6 +102,14 @@ def build_context(query: str) -> tuple[str, dict]:
     return context, out.trace
 
 async def event_gen(query: str, session_id: str):
+    # PreFilter 保守模式（D02 §3.2）
+    from .prefilter import prefilter, TRIVIAL_REPLY
+    pf = prefilter(query)
+    if not pf["passed"]:
+        yield f"data: {json.dumps({'type': 'prefilter_blocked', 'reason': pf['reason']}, ensure_ascii=False)}\n\n"
+        yield f"data: {json.dumps({'type': 'final', 'answer': TRIVIAL_REPLY}, ensure_ascii=False)}\n\n"
+        yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+        return
     trace_id = uuid.uuid4().hex
     yield f"data: {json.dumps({'type': 'session_start', 'session_id': session_id, 'trace_id': trace_id}, ensure_ascii=False)}\n\n"
 

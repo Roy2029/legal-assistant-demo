@@ -31,6 +31,12 @@
 
 ## 阶段简报
 
+### W3 关闭 - 知识库问答闭环（2026-08-26）
+- 完成：SSE /api/chat、引用校验器（打回1次+追加提示）、PreFilter 保守模式、LLM 客户端（.env）、React 前端（问答流式 + Trace 双视图 + dense/BM25 中间 chunk + BM25 分词 + 设置页 + 词典管理）、一键启动脚本
+- 测试：19/19 单元测试通过；真实 LLM 链路验证通过（民法典第32/580条）
+- 经验：① Trace 中间结果（dense/BM25 分路）对判断检索质量至关重要；② exact_match 查询按目标条文截取上下文片段，避免 LLM 在大块中找不到目标条文；③ GTX 1650 显存不足，M0 关闭 rerank
+
+
 ### W2 关闭 - 检索服务适配（2026-08-25）
 - **完成**：chunker_v2（D01 目标策略）、query_parser、difficulty、lexicon_service、retrieval_service、rebuild_index_v2（GPU）、citation_checker（部分 W3）
 - **索引重建**：451 份法规 → 4,052 parents / 18,058 children / 22,110 向量（Qdrant embedded，221MB）

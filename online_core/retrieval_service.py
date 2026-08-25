@@ -106,10 +106,21 @@ class RetrievalService:
                 else:
                     must.append({"key": key, "match": {"value": v}})
             filters = {"must": must}
-        # 5. 混合检索
-        method = self._get_method()
+        # 5. 混合检索（拆开 dense/sparse，暴露中间结果供 trace 展示）
+        store = self._get_store()
+        emb = self._get_embedding()
+        qvec = emb.embed_texts([query])[0]
         top_k = self.config.recall_top_k
-        raw = method.search(query, top_k=top_k, filters=filters)
+        from offline_core.store import SearchQuery
+        dense_sq = SearchQuery(text=query, dense_vector=qvec, mode="dense", filters=filters)
+        sparse_sq = SearchQuery(text=query, mode="sparse", filters=filters)
+        dense_results = store.search(dense_sq, top_k=top_k)
+        sparse_results = store.search(sparse_sq, top_k=top_k)
+        raw = HybridMethod._rrf_fuse([dense_results, sparse_results], top_k)
+        import jieba
+        bm25_tokens = jieba.lcut(query)
+        dense_topk = [{"chunk_id": r.chunk.chunk_id, "score": round(float(r.score), 4), "text": r.chunk.text[:80]} for r in dense_results[:10]]
+        bm25_topk = [{"chunk_id": r.chunk.chunk_id, "score": round(float(r.score), 4), "text": r.chunk.text[:80]} for r in sparse_results[:10]]
         # 6. rerank（exact_match 跳过精排：精确法条号查询候选已高度相关，且 rerank 在低显存机器极慢）
         results = raw
         if self.config.enable_rerank and not pq.exact_match:
@@ -132,6 +143,9 @@ class RetrievalService:
                 "excluded": pq.excluded,
             },
             "difficulty": diff,
+            "bm25_tokens": bm25_tokens,
+            "dense_topk": dense_topk,
+            "bm25_topk": bm25_topk,
             "rrf_raw_count": len(raw),
             "final_count": len(results),
         }
