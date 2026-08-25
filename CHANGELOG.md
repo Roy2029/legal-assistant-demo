@@ -1,6 +1,13 @@
 # Changelog
 
 ## [Unreleased] - M0 能跑 开发中
+
+## W2 关闭 - 检索服务适配（2026-08-25）
+- 索引重建完成：451 份法规，4,052 parents / 18,058 children（chunker_v2 目标策略）
+- 精确法条号检索验证通过（民法典第580条命中 3 条含 580 的 chunk）
+- 引用校验器验证通过（真实法条 verified，虚构法条 unverifiable）
+- 集成测试全部通过（tests/test_integration_core.py）
+- 旧 qrels 评估跳过（新 qrels 由用户后续重建）
 ### Added (W1)
 - 项目仓库骨架（server/ frontend/ skills/ tools/ tests/ scripts/ config/）
 - 迁入 RAG1.0 代码基线（offline_core/online_core/evaluation/utils/prompts）

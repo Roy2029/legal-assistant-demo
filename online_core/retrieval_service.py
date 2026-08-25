@@ -102,6 +102,9 @@ class RetrievalService:
         if pq.filter:
             must = []
             for k, v in pq.filter.items():
+                if k == "effect_level":
+                    # M0 未填充 effect_level 元数据，仅记录不强制过滤
+                    continue
                 if k == "article_no":
                     # chunk 内含多条文，用 articles 列表 + any 匹配
                     must.append({"key": "metadata.articles", "match": {"any": v if isinstance(v, list) else [v]}})

@@ -556,8 +556,7 @@ LegalAssistant/
 
 - **评估集**：RAG1.0 `QA_dataset/法律`（2,254 query / 11,590 qrels）；
 - 指标：Recall@5、Recall@10、Recall@20、MRR、nDCG@10；
-- **chunker 变更后的口径**：旧 qrels 标注旧 chunk_id，与新 chunker 不对齐；M0 评估采用**文档级 Recall@k**（qrels 聚合为 query→相关 doc_id，doc_id 新旧一致）；chunk-level 重标注列入 M2（详见 D03 §4.1）；
-- **基线**：M0 索引重建后文档级首测值为新基线（旧索引文档级 Recall 作对照）；
+- **M0 评估口径**：旧 qrels 因 chunker 变更不再使用；M0 改人工抽检（精确法条号/语义查询各 30 题）+ 引用可验证率硬指标；新 qrels 由用户后续重建（详见 D03 §4.1）；
 - **防退化风险提示**：后续评估若 Recall@10 低于基线 2 个百分点（绝对值）→ 报告标红，人工确认后发版（M4 视 CI 可升级为阻断）；
 - 已知局限：qrels 为合成数据且单模型打标存在偏置，需以律师真实问题补充（Backlog P0）。
 

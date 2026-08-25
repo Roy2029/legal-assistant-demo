@@ -74,6 +74,20 @@ def extract_citations(text: str) -> list[Citation]:
             if article and not article.isdigit():
                 article = _cn_to_arabic(article)
             out.append(Citation(law_name=law, article_no=article, raw=raw))
+    # 泛化兜底：不在别名表中的"XX法/条例/规定/解释/办法 第X条"
+    generic_pat = re.compile(
+        r"(?<![根据依据按照依照])"
+        r"([一-鿿]{2,20}(?:法|条例|规定|解释|办法|规则))"
+        r"(?:第([一二三四五六七八九十百零千\d]+)条)"
+    )
+    for m in generic_pat.finditer(text):
+        raw = m.group(0)
+        law = re.sub(r"^(根据|依据|按照|依照)+", "", m.group(1))
+        article = m.group(2)
+        if article and not article.isdigit():
+            article = _cn_to_arabic(article)
+        out.append(Citation(law_name=law, article_no=article, raw=raw))
+
     # 去重
     seen = set()
     unique = []

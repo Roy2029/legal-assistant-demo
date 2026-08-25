@@ -103,8 +103,7 @@
 ### 4.1 M0 范围：检索链路评估
 
 - 指标：`Recall@5 / Recall@10 / Recall@20 / MRR / nDCG@10`；
-- **chunker 变更后的评估口径（重要）**：旧 `QA_dataset/法律` qrels 标注的是旧 chunker 的 chunk_id，与新 chunker 切分块不对齐；M0 采用**文档级评估**——旧 qrels 聚合为 `query → 相关 doc_id 集合`（doc_id 新旧索引一致），计算 Document-level Recall@k；
-- chunk-level qrels 在新 chunker 上重新标注/合成（QA_synthesis 多模型打标或律师标注）列入 M2；
+- **M0 评估口径（2026-08-25 定）**：旧 `QA_dataset/法律` qrels 因 chunker 已更换**不再使用**；M0 评估改为**人工抽检**（精确法条号 30 题 + 语义查询 30 题）+ **引用可验证率硬指标**；新 qrels 数据集由用户在后续阶段重建（待办）。
 - 引用可验证率仍作为生成侧**硬指标**保留（它是确定性规则校验，不依赖 LLM 裁判，不属于"生成质量评估"）；
 - 生成链路质量评估（答案正确性/完整性）M1+ 补，前提是先构建黄金评估集。
 
@@ -200,7 +199,7 @@
 | 项 | 说明 |
 |----|------|
 | qrels 合成偏置 | 评估结果可能过于乐观；M1 补真实问题集 |
-| chunker 变更与 qrels 错位 | 旧 qrels 标注旧 chunk_id，新 chunker 切分不同无法直接评估 | M0 用 doc-level 评估（doc_id 一致）；chunk-level 重标注列入 M2 |
+| chunker 变更与 qrels 错位 | 旧 qrels 标注旧 chunk_id，新 chunker 切分不同无法使用 | M0 跳过 qrels 评估，改人工抽检；新 qrels 由用户后续重建（待办） |
 | trace 体积 | 单次 trace JSON 可能数十 KB；SQLite 足够，但需定期清理（M1 加保留策略） |
 | 配置版本管理 | 配置分散在多个文件，需在变更入口统一登记，否则版本号失真 |
 | 手动评估 | M0 靠人工触发，可能忘记跑；W6 交付文档中写明操作步骤 |

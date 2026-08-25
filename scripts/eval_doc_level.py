@@ -19,23 +19,36 @@ NEW_INDEX = Path("D:/个人/legal-assistant-demo/data/indices/法律/qdrant")
 QA_DIR = Path("D:/个人/legal-assistant-demo/QA_dataset/法律")
 
 
-def build_old_chunk_doc_map() -> dict[str, str]:
-    """旧索引: chunk_id -> doc_id。"""
+def build_old_chunk_doc_map(needed_chunk_ids: set[str] | None = None) -> dict[str, str]:
+    """旧索引: chunk_id -> doc_id。只查询需要的 chunk_id（点查，避免全量 scroll）。"""
     from qdrant_client import QdrantClient
     c = QdrantClient(path=str(OLD_INDEX))
     mapping = {}
-    offset = None
-    while True:
-        pts, nxt = c.scroll(collection_name="chunks", limit=500, offset=offset, with_payload=True, with_vectors=False)
-        if not pts:
-            break
-        for p in pts:
-            payload = p.payload or {}
-            cid = payload.get("chunk_id")
-            did = payload.get("doc_id")
-            if cid and did:
-                mapping[cid] = did
-        offset = nxt
+    if needed_chunk_ids:
+        ids = sorted(needed_chunk_ids)
+        # 分批 retrieve
+        for i in range(0, len(ids), 200):
+            batch = ids[i:i+200]
+            pts = c.retrieve(collection_name="chunks", ids=batch, with_payload=True, with_vectors=False)
+            for p in pts:
+                payload = p.payload or {}
+                cid = payload.get("chunk_id")
+                did = payload.get("doc_id")
+                if cid and did:
+                    mapping[cid] = did
+    else:
+        offset = None
+        while True:
+            pts, nxt = c.scroll(collection_name="chunks", limit=500, offset=offset, with_payload=True, with_vectors=False)
+            if not pts:
+                break
+            for p in pts:
+                payload = p.payload or {}
+                cid = payload.get("chunk_id")
+                did = payload.get("doc_id")
+                if cid and did:
+                    mapping[cid] = did
+            offset = nxt
     c.close()
     return mapping
 
@@ -67,7 +80,12 @@ def main():
     args = ap.parse_args()
 
     ks = [int(x) for x in args.k.split(",")]
-    chunk_doc_map = build_old_chunk_doc_map()
+    # 先读 qrels 收集需要的 chunk_id，再点查旧索引
+    qrels_raw = json.loads(Path(args.qrels).read_text(encoding="utf-8"))
+    needed = {e["chunk_id"] for e in qrels_raw}
+    print(f"qrels 涉及 {len(needed)} 个唯一 chunk_id，开始点查旧索引...", flush=True)
+    chunk_doc_map = build_old_chunk_doc_map(needed)
+    print(f"旧索引映射 {len(chunk_doc_map)} 条", flush=True)
     doc_qrels = build_doc_qrels(Path(args.qrels), chunk_doc_map)
 
     queries = json.loads(Path(args.queries).read_text(encoding="utf-8"))
@@ -104,8 +122,8 @@ def main():
         for k in ks:
             if relevant & set(got[:k]):
                 hit_at_k[k] += 1
-        if i % 100 == 0:
-            print(f"  {i}/{len(queries)} done")
+        if i % 10 == 0:
+            print(f"  {i}/{len(queries)} done", flush=True)
 
     print(f"\n文档级评估结果（{total} 个有相关 doc 的 query）:")
     for k in ks:
