@@ -26,3 +26,7 @@ __pycache__/
 # 凭据
 .env
 *.cookies.json
+
+# frontend
+frontend/node_modules/
+frontend/dist/
