@@ -12,6 +12,7 @@ from .kb_api import router as kb_router
 from .assistant_api import router as assistant_router
 from .update_api import router as update_router
 from .session_api import router as session_router
+from .chunk_api import router as chunk_router
 
 app = FastAPI(title="法律助手 Demo", version="0.1.0")
 
@@ -29,6 +30,7 @@ app.include_router(kb_router)
 app.include_router(assistant_router)
 app.include_router(update_router)
 app.include_router(session_router)
+app.include_router(chunk_router)
 register_error_handlers(app)
 
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button, Card, Collapse, Form, Input, List, Space, Tabs, Tag, Typography, message } from 'antd'
+import { Button, Card, Collapse, Form, Input, List, Modal, Space, Tabs, Tag, Typography, message } from 'antd'
 import { SendOutlined, StopOutlined } from '@ant-design/icons'
 
 const { Text, Paragraph } = Typography
@@ -20,6 +20,7 @@ function ChatPage() {
   const [streaming, setStreaming] = useState(false)
   const [trace, setTrace] = useState(null)
   const [citations, setCitations] = useState([])
+  const [chunkModal, setChunkModal] = useState(null)
   const abortRef = useRef(null)
 
   async function send() {
@@ -67,6 +68,7 @@ function ChatPage() {
               setCitations(evt)
             } else if (evt.type === 'final') {
               assistant = evt.answer
+              if (evt.citations) setCitations(evt.citations)
               setMessages((m) => {
                 const next = [...m]
                 next[next.length - 1] = { role: 'assistant', content: assistant, pending: false }
@@ -113,6 +115,21 @@ function ChatPage() {
             </div>
           ))}
         </div>
+        {citations.length > 0 && (
+          <div style={{ padding: '4px 8px' }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>引用法条（点击定位原文）：</Text>{' '}
+            {citations.map((c, i) => (
+              <Tag key={i} color="blue" style={{ cursor: 'pointer' }} onClick={async () => {
+                const r = await fetch('/api/chunk/locate?law_name=' + encodeURIComponent(c.law_name) + '&article_no=' + encodeURIComponent(c.article_no))
+                const d = await r.json()
+                setChunkModal(d.ok ? d.data : { text: '未定位到原文', law_name: c.law_name, article_no: c.article_no })
+              }}>{c.law_name} 第{c.article_no}条</Tag>
+            ))}
+          </div>
+        )}
+        <Modal open={!!chunkModal} onCancel={() => setChunkModal(null)} footer={null} title={chunkModal ? `${chunkModal.law_name} 第${chunkModal.article_no}条` : ''}>
+          <pre style={{ whiteSpace: 'pre-wrap', maxHeight: 400, overflow: 'auto', fontSize: 13 }}>{chunkModal?.text}</pre>
+        </Modal>
         <div style={{ display: 'flex', gap: 8, paddingTop: 8 }}>
           <Input.TextArea value={input} onChange={(e) => setInput(e.target.value)} onPressEnter={(e) => { e.preventDefault(); send() }} placeholder="输入法律问题，如：民法典第580条说了什么" autoSize={{ minRows: 2, maxRows: 6 }} disabled={streaming} />
           <Space>

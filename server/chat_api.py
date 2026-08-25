@@ -194,7 +194,8 @@ async def event_gen(query: str, session_id: str):
         engine.dispose()
     except Exception:
         pass
-    yield f"data: {json.dumps({'type': 'final', 'answer': final}, ensure_ascii=False)}\n\n"
+    yield f"data: {json.dumps({'type': 'final', 'answer': final, 'citations': [{'law_name': c.law_name, 'article_no': c.article_no} for c in result.verified]}, ensure_ascii=False)}\n\n"
+
     yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
 
 

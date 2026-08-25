@@ -2,6 +2,9 @@
 
 ## [Unreleased] - M0 能跑 开发中
 
+### Added（M0 遗留项完成）
+- 引用卡片点击定位原文：/api/chunk/locate + 前端引用标签 + Modal 原文展示
+
 ## M1 W7 进展（2026-08-26）
 - 会话管理 API（/api/sessions CRUD + 消息）
 - chat 消息持久化 + 历史注入（最近 20 条）+ 上下文压缩
