@@ -158,6 +158,28 @@ class RetrievalService:
         }
         return RetrievalOutput(query=query, parsed=pq, difficulty=diff, results=results, trace=trace)
 
+    def search_multi(self, queries: list[str], corpus_scope: str = "all") -> RetrievalOutput:
+        """多子查询并行检索合并（D02 §8 / M1 knowledge_agent）。"""
+        if not queries:
+            return RetrievalOutput(query="", parsed={}, difficulty={}, results=[], trace={})
+        outs = [self.search(q, corpus_scope=corpus_scope) for q in queries]
+        merged = {}
+        for o in outs:
+            for r in o.results:
+                cid = r.chunk.chunk_id
+                if cid in merged:
+                    merged[cid].score += r.score
+                else:
+                    merged[cid] = r
+        results = sorted(merged.values(), key=lambda x: x.score, reverse=True)[: self.config.recall_top_k]
+        return RetrievalOutput(
+            query=" | ".join(queries),
+            parsed=outs[0].parsed,
+            difficulty={"level": "hard", "rule_hit": "multi_query", "top_k": 8},
+            results=results,
+            trace={"sub_queries": queries, "sub_counts": [len(o.results) for o in outs], "merged_count": len(results)},
+        )
+
 
 _service: Optional[RetrievalService] = None
 

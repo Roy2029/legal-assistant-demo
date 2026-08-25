@@ -50,3 +50,16 @@ if __name__ == "__main__":
     test_effect_level_filter()
     test_citation_verification()
     print("ALL CORE INTEGRATION TESTS PASSED")
+
+
+def test_search_multi():
+    svc = get_retrieval_service()
+    out = svc.search_multi(["实际施工人", "发包人 工程款"], corpus_scope="all")
+    assert len(out.results) > 0
+    assert out.trace["sub_counts"][0] > 0 and out.trace["sub_counts"][1] > 0
+    print("PASS search_multi")
+
+
+if __name__ == "__main__":
+    test_exact_article_retrieval(); test_effect_level_filter(); test_citation_verification(); test_search_multi()
+    print("ALL CORE INTEGRATION TESTS PASSED")
