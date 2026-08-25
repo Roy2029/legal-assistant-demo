@@ -36,6 +36,32 @@ def get_citation() -> CitationChecker:
     return _citation
 
 
+def arabic_to_chinese(num: str) -> str:
+    """阿拉伯数字条文号 → 中文数字（如 32 → 三十二）。"""
+    digits = "零一二三四五六七八九"
+    n = int(num)
+    if n <= 10:
+        return digits[n] if n < 10 else "十"
+    if n < 20:
+        return "十" + digits[n % 10]
+    if n < 100:
+        tens = n // 10
+        ones = n % 10
+        return digits[tens] + "十" + (digits[ones] if ones else "")
+    return num
+
+def extract_article_snippet(text: str, article_no: str, max_chars: int = 600) -> str:
+    """在 chunk 文本中定位第 article_no 条，截取该条附近片段。"""
+    import re
+    cn = arabic_to_chinese(article_no)
+    m = re.search(r"第" + cn + r"条", text)
+    if not m:
+        return None
+    start = m.start()
+    next_m = re.search(r"第[一二三四五六七八九十百零千]+条", text[start + 1:])
+    end = start + 1 + next_m.start() if next_m else min(len(text), start + max_chars)
+    return text[max(0, start - 30):end].strip()
+
 SYSTEM_PROMPT = """你是一名法律研究助手。只能依据提供的检索资料作答。
 规则：
 1. 引用法条必须使用资料中出现的名称与条文号，禁止编造；
@@ -49,14 +75,31 @@ DISCLAIMER = "\n\n---\n本回答由 AI 生成，不构成正式法律意见，�
 def build_context(query: str) -> tuple[str, dict]:
     svc = get_retrieval()
     out = svc.search(query)
+    target_article = None
+    try:
+        from online_core.query_parser import parse_query
+        pq = parse_query(query)
+        if pq.exact_match and isinstance(pq.article_no, str):
+            target_article = pq.article_no
+    except Exception:
+        pass
     blocks = []
+    seen = set()
     for r in out.results:
         m = r.chunk.metadata or {}
+        text = r.chunk.text
+        if target_article:
+            snippet = extract_article_snippet(text, target_article)
+            if snippet:
+                key = snippet[:120]
+                if key in seen:
+                    continue
+                seen.add(key)
+                text = snippet
         src = f"{m.get('law_name', '未知法规')} 第{m.get('article_no', '?')}条"
-        blocks.append(f"[来源：{src}]\n{r.chunk.text}")
+        blocks.append(f"[来源：{src}]\n{text}")
     context = "\n\n".join(blocks) if blocks else "（检索无结果）"
     return context, out.trace
-
 
 async def event_gen(query: str, session_id: str):
     trace_id = uuid.uuid4().hex

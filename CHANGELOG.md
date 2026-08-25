@@ -2,6 +2,11 @@
 
 ## [Unreleased] - M0 能跑 开发中
 
+### Fixed
+- 精确法条号检索 0 召回（第32条）：根因是命中 chunk 以第13条开头、目标条文在中后部，LLM 未找到；改为 exact_match 时按目标条文截取上下文片段
+- reranker 在 GTX 1650 上极慢（580s/批）：M0 默认关闭 rerank，exact_match 跳过精排；语义检索 10 分钟 → 3 秒
+- 一键启动脚本闪退：移至根目录、全英文、空标题 start /B、ping 延时、pause 停留
+
 ### Added (W3)
 - /api/chat SSE 流式问答（retrieval→generation→citation_check→final）
 - 引用校验器（打回 1 次 + 追加未验证提示；真实法条/虚构法条测试通过）
