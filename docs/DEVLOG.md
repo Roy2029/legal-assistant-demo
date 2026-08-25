@@ -31,6 +31,12 @@
 
 ## 阶段简报
 
+### W6 关闭 - 打磨与交付（2026-08-26，代码部分）
+- 完成：可逆脱敏（desensitize + restore）、update 占位 API、demo 演示脚本、全量测试 31/31
+- 人工验收待办：Inno Setup 安装包制作、全新 Windows 虚拟机验收、律师朋友体验
+- 经验：① 脱敏映射表是最高敏感资产，Fernet 加密 + 密钥分离；② 全量 pytest 中 Qdrant 本地嵌入式多实例会锁冲突，测试必须复用单例或先 close
+
+
 ### W5 关闭 - 实务助手框架（2026-08-26）
 - 完成：skill 注册表（SKILL.md frontmatter 解析）、4 个业务动作桩、/api/assistant SSE 工具调度、kb_retrieval/case_retrieval 工具
 - 测试：3/3 通过（actions/assistant_stream/unknown_action）

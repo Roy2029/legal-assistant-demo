@@ -2,6 +2,13 @@
 
 ## [Unreleased] - M0 能跑 开发中
 
+## W6 关闭 - 打磨与交付（代码部分，2026-08-26）
+- 规则版可逆脱敏（手机/身份证/银行卡/公司名 + Fernet 加密映射 + 最终输出还原）
+- /api/update 占位（增量更新未接爬虫，明确状态）
+- 演示脚本 scripts/demo_guide.md
+- 全量测试 31/31 通过
+- 人工验收待办：Inno Setup 安装包、虚拟机验收、律师体验
+
 ## W5 关闭 - 实务助手框架（2026-08-26）
 - Skill 注册表：skills/*/SKILL.md（4 个业务动作：案例检索/案情分析/合同审查/法律研究备忘录）
 - /api/actions + /api/assistant SSE（step_start/tool_call/tool_result/final）

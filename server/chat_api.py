@@ -118,6 +118,11 @@ async def event_gen(query: str, session_id: str):
     context, trace = build_context(query)
     yield f"data: {json.dumps({'type': 'trace', 'trace': trace}, ensure_ascii=False)}\n\n"
 
+
+    # 脱敏：送 LLM 上下文与 query 脱敏（可逆假名化，D07）
+    from .desensitize import desensitize, restore
+    masked_context, _ = desensitize(context)
+    masked_query, _ = desensitize(query)
     if not llm_client.configured:
         yield f"data: {json.dumps({'type': 'error', 'code': 'llm_not_configured', 'message': 'LLM 未配置，请在设置页填写 Base URL / API Key / Model'}, ensure_ascii=False)}\n\n"
         return
@@ -125,7 +130,7 @@ async def event_gen(query: str, session_id: str):
     # 2. 生成（首次）
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": f"问题：{query}\n\n检索资料：\n{context}"},
+        {"role": "user", "content": f"问题：{masked_query}\n\n检索资料：\n{masked_context}"},
     ]
     answer = ""
     yield f"data: {json.dumps({'type': 'step_start', 'step': 'generation'}, ensure_ascii=False)}\n\n"
@@ -157,7 +162,7 @@ async def event_gen(query: str, session_id: str):
         suffix = "\n\n⚠️ 以下引用未能验证，请核实：\n" + "\n".join(f"- {c.raw}" for c in result.unverifiable)
         yield f"data: {json.dumps({'type': 'citation_check', 'unverifiable': [c.raw for c in result.unverifiable]}, ensure_ascii=False)}\n\n"
 
-    final = answer + suffix + DISCLAIMER
+    final = restore(answer + suffix) + DISCLAIMER
     yield f"data: {json.dumps({'type': 'final', 'answer': final}, ensure_ascii=False)}\n\n"
     yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
 

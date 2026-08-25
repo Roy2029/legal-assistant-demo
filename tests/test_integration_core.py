@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from online_core.retrieval_service import RetrievalService, RetrievalConfig
+from online_core.retrieval_service import get_retrieval_service
 from online_core.citation_checker import CitationChecker
 from online_core.query_parser import parse_query
 from online_core.difficulty import estimate
@@ -11,7 +11,7 @@ from online_core.difficulty import estimate
 INDEX = str(Path("D:/个人/legal-assistant-demo/data/indices/法律/qdrant"))
 
 def test_exact_article_retrieval():
-    svc = RetrievalService(RetrievalConfig(index_path=INDEX))
+    svc = get_retrieval_service()
     out = svc.search("民法典第580条")
     assert len(out.results) > 0, "精确法条号应命中"
     assert out.difficulty["level"] == "simple"
@@ -22,7 +22,7 @@ def test_exact_article_retrieval():
 
 
 def test_effect_level_filter():
-    svc = RetrievalService(RetrievalConfig(index_path=INDEX))
+    svc = get_retrieval_service()
     out = svc.search("司法解释关于实际施工人怎么规定")
     # M0 效力级别元数据未填充，语义检索应有结果（不强制过滤）
     assert len(out.results) > 0
@@ -30,6 +30,11 @@ def test_effect_level_filter():
 
 
 def test_citation_verification():
+    # 释放单例 Qdrant 锁，避免本地嵌入式锁冲突
+    svc0 = get_retrieval_service()
+    if svc0._store is not None:
+        svc0._store.close()
+        svc0._store = None
     cc = CitationChecker(index_path=INDEX)
     res = cc.verify("根据民法典第580条，违约方可以请求终止合同。")
     assert res.verified, "民法典第580条应可验证"
