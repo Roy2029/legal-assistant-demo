@@ -10,6 +10,15 @@
 - [设计文档](docs/designs/)：D01-D08 模块设计
 - [资产索引](docs/INVENTORY_RAG1.0.md)：RAG1.0 资产盘点
 
+## 快速启动（开发模式）
+
+1. 准备 Python 环境：`.venv`（已就绪）并安装依赖：`.venv/Scripts/pip install -r requirements.txt`
+2. 在项目根目录配置 `.env`（LLM_API_KEY / LLM_BASE_URL，可选 LLM_MODEL）
+3. 双击 **`start_all.bat`**（一键启动后端+前端+打开浏览器）
+4. 停止：双击 **`stop_all.bat`**
+
+前端开发服务器：http://127.0.0.1:5173 ｜ 后端 API：http://127.0.0.1:8000
+
 ## 开发状态
 
 见 [CHANGELOG.md](CHANGELOG.md) 与 `docs/DEVLOG.md`。
