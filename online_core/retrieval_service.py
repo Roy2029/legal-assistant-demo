@@ -81,7 +81,8 @@ class RetrievalService:
             self._reranker = CrossEncoderReranker(model_path=self.config.reranker_model, device="cpu", use_fp16=False)
         return self._reranker
 
-    def search(self, query: str) -> RetrievalOutput:
+    def search(self, query: str, corpus_scope: str = "all") -> RetrievalOutput:
+        """corpus_scope: all（public+本人 user）/ public / user。"""
         # 1. query 解析
         pq = parse_query(query)
         # 2. 难度分档
@@ -90,8 +91,13 @@ class RetrievalService:
         apply_user_lexicon()
         # 4. 构造 Qdrant filter（元数据字段位于 payload.metadata 下，用嵌套 key）
         filters = None
+        must = []
+        if corpus_scope == "public":
+            must.append({"key": "metadata.corpus", "match": {"value": "public"}})
+        elif corpus_scope == "user":
+            must.append({"key": "metadata.corpus", "match": {"value": "user"}})
+            must.append({"key": "metadata.user_id", "match": {"value": "local"}})
         if pq.filter:
-            must = []
             for k, v in pq.filter.items():
                 if k == "effect_level":
                     # M0 未填充 effect_level 元数据，仅记录不强制过滤
@@ -105,6 +111,7 @@ class RetrievalService:
                     must.append({"key": key, "match": {"any": v}})
                 else:
                     must.append({"key": key, "match": {"value": v}})
+        if must:
             filters = {"must": must}
         # 5. 混合检索（拆开 dense/sparse，暴露中间结果供 trace 展示）
         store = self._get_store()

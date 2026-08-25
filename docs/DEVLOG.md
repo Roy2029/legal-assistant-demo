@@ -31,6 +31,12 @@
 
 ## 阶段简报
 
+### W4 关闭 - 用户知识库（2026-08-26）
+- 完成：上传/列表/删除 API、md/txt/docx 解析入库、corpus=user + user_id 元数据隔离、检索 corpus_scope、复用单例 QdrantStore 避免锁冲突
+- 测试：pytest 1 passed（上传→列表→scope=user 检索命中→删除→不命中）；txt/docx 实测上传成功
+- 经验：① 测试内必须复用 get_retrieval_service() 单例，新建 QdrantStore 会锁冲突；② 上传大文件首次加载 embedding 模型约 30s，curl 测试要放宽超时
+
+
 ### W3 关闭 - 知识库问答闭环（2026-08-26）
 - 完成：SSE /api/chat、引用校验器（打回1次+追加提示）、PreFilter 保守模式、LLM 客户端（.env）、React 前端（问答流式 + Trace 双视图 + dense/BM25 中间 chunk + BM25 分词 + 设置页 + 词典管理）、一键启动脚本
 - 测试：19/19 单元测试通过；真实 LLM 链路验证通过（民法典第32/580条）

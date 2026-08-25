@@ -2,6 +2,13 @@
 
 ## [Unreleased] - M0 能跑 开发中
 
+## W4 关闭 - 用户知识库（2026-08-26）
+- /api/kb/upload：md/txt/docx 解析入库（python-docx/MarkdownParser/pypdf），corpus=user 元数据隔离
+- /api/kb/docs 列表 + DELETE 删除（同步删向量与文件）
+- 检索隔离 corpus_scope（all/public/user）
+- 测试：test_kb_api 上传→列表→隔离检索→删除通过；txt/docx 实测上传成功
+- pdf 解析代码就绪（pypdf 文本层），待用户提供样例测试
+
 ## W3 关闭 - 知识库问答闭环（2026-08-26）
 - PreFilter 保守模式（只拦明显闲聊，宁放勿杀）
 - Trace 面板展示 dense/BM25 各自召回 chunk 列表（可折叠展开）与 BM25 查询分词
