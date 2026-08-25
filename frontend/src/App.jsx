@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button, Card, Collapse, Form, Input, List, Modal, Space, Tabs, Tag, Typography, message } from 'antd'
+import { Button, Card, Collapse, Form, Input, List, Modal, Select, Space, Tabs, Tag, Typography, message } from 'antd'
 import { SendOutlined, StopOutlined } from '@ant-design/icons'
 
 const { Text, Paragraph } = Typography
@@ -16,6 +16,34 @@ function ChunkList({ items }) {
 
 function ChatPage() {
   const [messages, setMessages] = useState([])
+  const [sessions, setSessions] = useState([])
+  const [sessionId, setSessionId] = useState('local-demo')
+
+  useEffect(() => { loadSessions() }, [])
+
+  async function loadSessions() {
+    const r = await fetch('/api/sessions')
+    const d = await r.json()
+    if (d.ok && d.data.length) { setSessions(d.data); setSessionId(d.data[0].session_id); loadMessages(d.data[0].session_id) }
+  }
+
+  async function loadMessages(sid) {
+    const r = await fetch('/api/sessions/' + sid + '/messages')
+    const d = await r.json()
+    if (d.ok) setMessages(d.data.map((m) => ({ role: m.role, content: m.content })))
+  }
+
+  async function newSession() {
+    const r = await fetch('/api/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: '新会话' }) })
+    const d = await r.json()
+    if (d.ok) { setSessionId(d.data.session_id); setMessages([]); loadSessions() }
+  }
+
+  async function deleteSession() {
+    await fetch('/api/sessions/' + sessionId, { method: 'DELETE' })
+    setMessages([])
+    loadSessions()
+  }
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
   const [trace, setTrace] = useState(null)
@@ -39,7 +67,7 @@ function ChatPage() {
       const resp = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q, session_id: 'local-demo' }),
+        body: JSON.stringify({ query: q, session_id: sessionId }),
         signal: ctrl.signal,
       })
       const reader = resp.body.getReader()
@@ -130,6 +158,11 @@ function ChatPage() {
         <Modal open={!!chunkModal} onCancel={() => setChunkModal(null)} footer={null} title={chunkModal ? `${chunkModal.law_name} 第${chunkModal.article_no}条` : ''}>
           <pre style={{ whiteSpace: 'pre-wrap', maxHeight: 400, overflow: 'auto', fontSize: 13 }}>{chunkModal?.text}</pre>
         </Modal>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+          <Select size='small' style={{ width: 220 }} value={sessionId} onChange={(v) => { setSessionId(v); loadMessages(v) }} options={sessions.map((s) => ({ value: s.session_id, label: s.title || s.session_id.slice(0, 8) }))} />
+          <Button size='small' onClick={newSession}>新建会话</Button>
+          <Button size='small' danger onClick={deleteSession}>删除</Button>
+        </div>
         <div style={{ display: 'flex', gap: 8, paddingTop: 8 }}>
           <Input.TextArea value={input} onChange={(e) => setInput(e.target.value)} onPressEnter={(e) => { e.preventDefault(); send() }} placeholder="输入法律问题，如：民法典第580条说了什么" autoSize={{ minRows: 2, maxRows: 6 }} disabled={streaming} />
           <Space>
