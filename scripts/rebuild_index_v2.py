@@ -95,6 +95,10 @@ def main():
     print(f"待处理 {len(files)} 份文件")
 
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
+    # 关键：索引期加载内置法律词典，保证与查询期分词一致（否则 BM25 sparse 错位）
+    from online_core.lexicon_service import load_builtin_lexicon
+    n_lex = load_builtin_lexicon()
+    print(f"内置法律词典已加载 {n_lex} 词（索引期分词）")
     chunker = LegalStructureChunker(tokenizer=tokenizer)
 
     device = args.device

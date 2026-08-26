@@ -4,13 +4,26 @@ import { SendOutlined, StopOutlined } from '@ant-design/icons'
 
 const { Text, Paragraph } = Typography
 
-function ChunkList({ items }) {
+function ChunkList({ items, onOpenFull }) {
+  if (!items || items.length === 0) return <Text type="secondary" style={{ fontSize: 12 }}>（无结果）</Text>
   return (
-    <Collapse size="small" items={(items || []).map((c, i) => ({
-      key: String(i),
-      label: <span style={{ fontSize: 12 }}>#{i + 1} score={c.score} {c.chunk_id?.slice(0, 18)}</span>,
-      children: <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap', maxHeight: 200, overflow: 'auto' }}>{c.text}</pre>,
-    }))} />
+    <div>
+      {items.map((c, i) => (
+        <Card key={i} size="small" style={{ marginBottom: 6 }} styles={{ body: { padding: 8 } }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Space size={4} wrap>
+              <Text strong style={{ fontSize: 12 }}>#{i + 1}</Text>
+              <Tag color="blue">{c.meta?.law_name || '未知'}{c.meta?.article_no ? ' 第' + c.meta.article_no + '条' : ''}</Tag>
+              <Tag>{c.meta?.chunk_level || '-'}</Tag>
+              {c.meta?.corpus && <Tag color={c.meta.corpus === 'user' ? 'orange' : 'green'}>{c.meta.corpus}</Tag>}
+              <Text type="secondary" style={{ fontSize: 11 }}>score={c.score}</Text>
+            </Space>
+            <Button size="small" type="link" onClick={() => onOpenFull && onOpenFull(c)}>全文</Button>
+          </div>
+          <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap', maxHeight: 80, overflow: 'hidden', marginTop: 4 }}>{c.text}</pre>
+        </Card>
+      ))}
+    </div>
   )
 }
 
@@ -49,6 +62,13 @@ function ChatPage() {
   const [trace, setTrace] = useState(null)
   const [citations, setCitations] = useState([])
   const [chunkModal, setChunkModal] = useState(null)
+  const [fullChunk, setFullChunk] = useState(null)
+
+  async function openFullChunk(c) {
+    const r = await fetch('/api/chunk/' + encodeURIComponent(c.chunk_id))
+    const d = await r.json()
+    setFullChunk(d.ok ? d.data : { text: c.text, law_name: c.meta?.law_name, article_no: c.meta?.article_no, chunk_id: c.chunk_id })
+  }
   const abortRef = useRef(null)
 
   async function send() {
@@ -155,6 +175,9 @@ function ChatPage() {
             ))}
           </div>
         )}
+        <Modal open={!!fullChunk} onCancel={() => setFullChunk(null)} footer={null} title={fullChunk ? `${fullChunk.law_name || ''} ${fullChunk.article_no ? '第' + fullChunk.article_no + '条' : ''} ${fullChunk.chunk_id || ''}`.trim() : ''} width={720}>
+          <pre style={{ whiteSpace: 'pre-wrap', maxHeight: 480, overflow: 'auto', fontSize: 13 }}>{fullChunk?.text}</pre>
+        </Modal>
         <Modal open={!!chunkModal} onCancel={() => setChunkModal(null)} footer={null} title={chunkModal ? `${chunkModal.law_name} 第${chunkModal.article_no}条` : ''}>
           <pre style={{ whiteSpace: 'pre-wrap', maxHeight: 400, overflow: 'auto', fontSize: 13 }}>{chunkModal?.text}</pre>
         </Modal>
@@ -173,7 +196,11 @@ function ChatPage() {
       <Card style={{ width: 420, overflow: 'auto' }} title="检索过程（Trace）" size="small">
         {!trace && <Text type="secondary">发送问题后展示检索过程</Text>}
         {trace && (
-          <Collapse size="small" defaultActiveKey={['parsed']} items={[
+          <Collapse size="small" defaultActiveKey={['final']} items={[
+            {
+              key: 'final', label: `最终上下文（RRF top-${trace.final_count}，难度：${trace.difficulty?.level || '-'}）`,
+              children: <ChunkList items={trace.final_topk || []} onOpenFull={openFullChunk} />,
+            },
             { key: 'parsed', label: 'Query 解析', children: <pre style={{ fontSize: 12 }}>{JSON.stringify(trace.parsed, null, 2)}</pre> },
             { key: 'difficulty', label: '难度分档', children: <pre style={{ fontSize: 12 }}>{JSON.stringify(trace.difficulty, null, 2)}</pre> },
             { key: 'bm25_tokens', label: 'BM25 查询分词', children: (
@@ -184,11 +211,11 @@ function ChatPage() {
               ) },
             {
               key: 'dense', label: `Dense 召回（${(trace.dense_topk || []).length}）`,
-              children: <ChunkList items={trace.dense_topk || []} />,
+              children: <ChunkList items={trace.dense_topk || []} onOpenFull={openFullChunk} />,
             },
             {
               key: 'bm25', label: `BM25 召回（${(trace.bm25_topk || []).length}）`,
-              children: <ChunkList items={trace.bm25_topk || []} />,
+              children: <ChunkList items={trace.bm25_topk || []} onOpenFull={openFullChunk} />,
             },
           ]} />
         )}

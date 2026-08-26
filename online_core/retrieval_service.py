@@ -126,8 +126,19 @@ class RetrievalService:
         raw = HybridMethod._rrf_fuse([dense_results, sparse_results], top_k)
         import jieba
         bm25_tokens = jieba.lcut(query)
-        dense_topk = [{"chunk_id": r.chunk.chunk_id, "score": round(float(r.score), 4), "text": r.chunk.text[:80]} for r in dense_results[:10]]
-        bm25_topk = [{"chunk_id": r.chunk.chunk_id, "score": round(float(r.score), 4), "text": r.chunk.text[:80]} for r in sparse_results[:10]]
+
+        def _meta(r):
+            m = r.chunk.metadata or {}
+            return {
+                "law_name": m.get("law_name", ""),
+                "article_no": m.get("article_no", ""),
+                "chunk_level": r.chunk.chunk_level,
+                "corpus": m.get("corpus", ""),
+                "doc_type": m.get("doc_type", ""),
+            }
+
+        dense_topk = [{"chunk_id": r.chunk.chunk_id, "score": round(float(r.score), 4), "text": r.chunk.text[:120], "meta": _meta(r)} for r in dense_results[:10]]
+        bm25_topk = [{"chunk_id": r.chunk.chunk_id, "score": round(float(r.score), 4), "text": r.chunk.text[:120], "meta": _meta(r)} for r in sparse_results[:10]]
         # 6. rerank（exact_match 跳过精排：精确法条号查询候选已高度相关，且 rerank 在低显存机器极慢）
         results = raw
         if self.config.enable_rerank and not pq.exact_match:
@@ -140,7 +151,9 @@ class RetrievalService:
         else:
             results = raw[: diff["top_k"]]
         # 7. 父子召回：命中 child → 返回 parent（M0：service 层标记，上层决定取 parent 文本）
+        final_topk = [{"chunk_id": r.chunk.chunk_id, "score": round(float(r.score), 4), "text": r.chunk.text[:120], "meta": _meta(r)} for r in results]
         trace = {
+            "final_topk": final_topk,
             "parsed": {
                 "law_name": pq.law_name,
                 "article_no": pq.article_no,
