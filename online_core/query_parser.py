@@ -62,12 +62,24 @@ def _find_law_name(query: str) -> Optional[str]:
 
 
 def _extract_articles_with_context(query: str):
-    """提取所有 第N条 及其前 5 字符语境。"""
+    """提取所有 第N条 及其前 5 字符语境；中文条文号统一转阿拉伯数字。
+
+    索引元数据 metadata.articles 存阿拉伯数字（chunker_v2 已转换），
+    若查询用中文条号（第二条）而不过滤则查不到任何 chunk。
+    """
+    from offline_core.docx_parser import chinese_to_arabic
+
     out = []
     for m in ARTICLE_RE.finditer(query):
+        raw = m.group(1)
+        if any(ch in "一二三四五六七八九十百零千" for ch in raw):
+            try:
+                raw = str(chinese_to_arabic(raw))
+            except Exception:
+                pass
         start = max(0, m.start() - 5)
         context = query[start:m.start()]
-        out.append({"article_no": m.group(1), "context": context, "start": m.start()})
+        out.append({"article_no": raw, "context": context, "start": m.start()})
     return out
 
 

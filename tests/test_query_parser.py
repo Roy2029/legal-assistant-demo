@@ -39,6 +39,14 @@ def test_multi_candidate():
     print("PASS multi_candidate")
 
 
+def test_chinese_article_to_arabic():
+    q = parse_query("根据《保险法》第二条，触发条件有哪些？")
+    assert q.exact_match is True
+    assert q.article_no == "2", f"中文条号应转阿拉伯数字，实际 {q.article_no}"
+    assert q.filter["article_no"] == "2"
+    print("PASS chinese_article_to_arabic")
+
+
 def test_no_match():
     q = parse_query("实际施工人能否向发包人主张工程款")
     assert q.exact_match is False
