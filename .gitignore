@@ -35,3 +35,7 @@ frontend/dist/
 data/test_upload.*
 data/eval_reports/
 data/rerank_test*.log
+
+# 敏感合同评测集（不入库）
+data/eval/contracts/*
+!data/eval/contracts/.gitkeep
