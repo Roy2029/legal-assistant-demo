@@ -1,0 +1,2789 @@
+{
+  "dataset": "D:\\个人\\legal-assistant-demo\\data\\eval\\prefilter_query01.jsonl",
+  "total": 2782,
+  "legal_total": 2375,
+  "non_legal_total": 407,
+  "confusion": {
+    "legal_passed": 2375,
+    "legal_blocked": 0,
+    "non_legal_blocked": 12,
+    "non_legal_passed": 395
+  },
+  "primary_metric": {
+    "legal_blocked_rate": 0.0,
+    "legal_pass_rate": 1.0
+  },
+  "secondary_metric": {
+    "non_legal_blocked_rate": 0.0295,
+    "non_legal_pass_rate": 0.9705
+  },
+  "overall_accuracy": 0.858,
+  "blocked_legal": [],
+  "passed_nonlegal": [
+    {
+      "query": "金融市场的功能不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "货币市场是指期限在多少以内的金融工具交易市场？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "资本市场的主要功能是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "我国的主板市场是指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "以下哪种属于直接融资方式？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "普通股股东享有的权利不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "A股和B股的主要区别在于？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "市盈率(P/E)的计算公式为？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "股票的面值通常为多少元人民币？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "债券的票面要素包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "国债是由谁发行的？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "当市场利率上升时，债券价格通常会？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "可转换债券的特点是可以转换为？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "开放式基金和封闭式基金的主要区别在于？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "ETF(交易所交易基金)的特点包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "公募基金和私募基金的主要区别在于？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "期货合约和远期合约的主要区别是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "看涨期权(Call Option)的买方拥有什么权利？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "期权的时间价值随着到期日的临近会？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "基本面分析主要关注哪些因素？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "技术分析的三大假设不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "贝塔系数(beta)衡量的是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "分散投资的主要目的是降低什么风险？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "夏普比率(Sharpe Ratio)衡量的是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "行业的生命周期一般分为哪几个阶段？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "波特五力模型中的五力不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "杜邦分析法将净资产收益率ROE分解为三个驱动因素不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "资产负债率等于负债总额除以资产总额乘以100%该指标反映企业的？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "现金流量的三种类型不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "证券从业人员的执业行为准则要求？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "证券公司在开展业务时应当遵循的原则不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "投资者适当性管理的核心要求是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "反洗钱工作的核心义务主体是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "证券公司及其从业人员不得从事的行为包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "马克思主义哲学的核心观点是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "习近平新时代中国特色社会主义思想被写入党章是在哪次全国代表大会上？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "「四个自信」不包括以下哪项？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国共产党第二十次全国代表大会于哪一年召开？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "「两个一百年」奋斗目标中，第一个百年奋斗目标是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "毛泽东思想的活的灵魂是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "邓小平理论的精髓是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "「五位一体」总体布局包括经济建设、政治建设、文化建设、社会建设和？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "「四个全面」战略布局中，引领方向的是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国共产党的根本宗旨是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "党的二十大报告指出，中国式现代化的本质要求中排在首位的是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "「三大攻坚战」不包括以下哪项？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "社会主义核心价值观个人层面的内容不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "新发展理念指的是创新、协调、绿色、开放和？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "我国的基本经济制度是什么？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "「两步走」战略安排中，到2035年的目标是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国共产党的最高理想和最终目标是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "「三会一课」制度中的「三会」不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "国内生产总值(GDP)是指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中央银行常用的货币政策工具不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "供给曲线通常向哪个方向倾斜？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "边际效用递减规律是指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "基尼系数是用来衡量什么的指标？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "恩格尔系数越大说明？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "完全竞争市场的特征不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "财政政策的实施主体是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "汇率上升(本币升值)有利于？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "我国当前实行的增值税税率档次中，一般纳税人的基本税率是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "「罢黜百家，独尊儒术」是由谁提出的？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国历史上最后一个封建王朝是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "「百家争鸣」出现在哪个历史时期？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "科举制度正式废除于哪一年？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "被称为「史家之绝唱，无韵之离骚」的著作是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国古代「四大名著」中成书时间最晚的是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "「戊戌变法」发生在哪一年？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "五四运动爆发的直接导火索是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "丝绸之路的起点是今天的哪座城市？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国历史上在位时间最长的皇帝是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "「文景之治」出现在哪个朝代？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "甲骨文最早发现于哪个朝代的遗址？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "「二十四节气」起源于哪个地区？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国第一部纪传体通史是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "郑和下西洋共进行了几次？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "5G网络相比4G最大的优势是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "北斗卫星导航系统是中国自主建设的？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "量子计算机利用的是什么原理进行计算？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "人工智能(AI)的核心技术领域不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "新能源汽车的动力来源主要是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "碳达峰是指二氧化碳排放量达到峰值后？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "芯片制造中的「光刻机」主要用于？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "以下哪种可再生能源不属于「新能源」范畴？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "大数据的「4V」特征不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "区块链技术的核心特点是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "嫦娥五号任务实现了我国首次？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "IPv4地址的最大数量约为？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "WiFi使用的无线通信频段通常是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "基因编辑技术CRISPR-Cas9的核心工具Cas9是一种？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "高铁列车主要采用什么动力驱动？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "以下关于疫苗的说法错误的是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "我国领土的最南端位于？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "我国面积最大的省级行政区是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "长江发源于哪里？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "我国人口最多的少数民族是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "世界上落差最大的瀑布是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "我国地势呈几级阶梯分布？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "北回归线自西向东穿过我国的哪些省区？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "有「塞上江南」之称的地区是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "地球上纬度最高的洋是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "我国著名的「南水北调」工程是将哪条河流的水调往北方？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "时区的划分是以本初子午线为基准，每隔经度多少度划分为一个时区？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "我国传统的「五音」指宫、商、角、徵和？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "「五行」学说中，「木」所对应的方位是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国传统节日端午节是为了纪念谁？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "联合国安全理事会常任理事国共有几个？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "G20峰会中「G20」代表的是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "ISO9000标准体系认证属于什么类型的国际标准？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "世界贸易组织(WTO)的前身是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "奥林匹克运动会的发源地是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "人体中含量最多的金属元素是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "以下哪种食物富含维生素D？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "「一带一路」是「丝绸之路经济带」和什么的总称？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国历史上第一个统一的封建王朝是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "秦始皇统一六国是在哪一年？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "被称为\"万世师表\"的是哪位历史人物？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "丝绸之路是哪个朝代开辟的？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "唐朝的开国皇帝是谁？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "\"贞观之治\"出现在哪位皇帝统治时期？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国古代四大发明中，最早发明的是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "郑和下西洋最远到达了哪里？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "清朝最后一位皇帝是谁？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "辛亥革命发生在哪一年？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "第一次工业革命起源于哪个国家？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "法国大革命爆发于哪一年？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "古埃及文明发源于哪条河流流域？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "文艺复兴运动起源于哪个国家？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "第二次世界大战结束于哪一年？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "世界上面积最大的国家是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "世界上最长的河流是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "世界上海拔最高的高原是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国的首都是哪座城市？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "世界上最大的沙漠是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "太平洋是世界上最大的什么？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "赤道穿过的大洲有几个？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国面积最大的省级行政区是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "世界上最深的海沟是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "长江全长约多少千米？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "有\"地球之肺\"之称的是什么？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "日本的首都是哪座城市？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "世界上人口最多的国家是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "欧洲最长的河流是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "位于亚洲和非洲之间的海峡是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "水的化学式是什么？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "光速约为每秒多少万千米？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "人体最大的器官是什么？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "DNA的全称是什么？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "太阳系中最大的行星是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "地球绕太阳公转一周大约需要多长时间？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "发现万有引力定律的科学家是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "提出相对论的科学家是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "元素周期表是由谁首创的？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "人体有多少块骨头？（成年人）",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "哪种气体在空气中含量最高？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "声音在哪种介质中传播速度最快？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "pH值小于7的溶液呈什么性？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "计算机的基本运算单位是什么？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "植物进行光合作用主要在哪个细胞器中进行？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "地球上最深的地方是马里亚纳海沟，其深度约为？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "诺贝尔奖不包括以下哪个奖项？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "电流的单位是什么？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "银河系大约包含多少颗恒星？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "哪种维生素缺乏会导致夜盲症？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "\"《红楼梦》\"的作者是谁？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "\"三国演义\"中，\"桃园三结义\"的三个人物是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "李白被后人称为什么？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "杜甫被后人称为什么？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "\"西游记\"中孙悟空的兵器叫什么？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "莎士比亚的代表作\"罗密欧与朱丽叶\"故事背景发生在哪个城市？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "\"老人与海\"的作者是谁？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国第一部诗歌总集是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "\"百年孤独\"的作者是谁？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "\"水浒传\"中有108位好汉，其中排第一位的是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "\"傲慢与偏见\"的作者是哪位女作家？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "唐代诗人中被称为\"诗佛\"的是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "\"战争与和平\"的作者是谁？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国现代文学史上第一篇白话小说是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "\"蒙娜丽莎\"的作者是谁？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "梵高的代表作品\"星月夜\"中主要描绘了什么？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国的国粹京剧的角色分为生、旦、净、几类？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "\"清明上河图\"描绘的是哪个朝代的都市生活？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "贝多芬的\"命运交响曲\"是第几交响曲？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "敦煌莫高窟主要以什么艺术形式闻名？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "《最后的晚餐》描绘的是耶稣与12门徒共进晚餐的场景，作者是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "钢琴有多少个黑白键（标准88键钢琴）？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国传统绘画\"四君子\"指的是梅、兰、竹和？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "印象派的代表画家除了梵高，还有谁创作了\"日出·印象\"？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "雕塑\"思想者\"的作者是谁？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国书法中\"楷书四大家\"不包括以下谁？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "芭蕾舞剧\"天鹅湖\"的音乐作曲家是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "奥运会每几年举办一届？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "足球比赛每队上场多少人？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "NBA篮球场三分线距离篮筐的距离是多少英尺？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "马拉松比赛的标准距离是多少？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "乒乓球比赛每局先得多少分者胜出（现行规则）？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "世界杯足球赛每几年举办一次？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国第一位获得奥运金牌的运动员是谁？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "F1赛车比赛中，红旗表示什么意思？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "网球大满贯赛事不包括以下哪项？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "游泳比赛中的蝶泳泳姿，双臂动作是怎样的？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "一年之中有多少个节气？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国的国旗五星红旗设计者是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "国际通用的求救信号SOS代表什么含义？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "人民币的面额中，最大面值是多少元？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "一天有多少小时？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "以下哪种动物是哺乳动物？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "微信是哪家公司开发的产品？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "世界上使用人数最多的语言是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "联合国总部设在哪个城市？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "以下哪种食物富含维生素C？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "一年中白天最长的一天是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "二维码的英文缩写是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国古代二十八宿分为四象东方七宿称为？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "农历正月初一在古代称为？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "干支纪年法中一个完整的周期为多少年？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "古代将一天分为十二时辰子时对应现在的时间是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "上元节中元节下元节分别指哪三个节日？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "古代男子成年礼称为？女子成年礼称为？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "五礼包括吉礼凶礼军礼宾礼和？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "古人以九拜中最隆重的跪拜礼是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "古代称对方的妻子为？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "唐代三省六部制中中书省的主要职能是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "六部中负责官员选拔考核的是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "科举制度中乡试的第一名称为？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "殿试前三名分别称为？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "古代九品中正制创立于哪个朝代？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "四书五经中的四书是指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "我国第一部诗歌总集是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "《资治通鉴》是一部什么体例的史书？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "建安七子中成就最高的是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "唐宋八大家中不属于唐代的是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国传统绘画六法论由谁提出？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国古琴最初有五根弦后文王加一根武王加一根共七弦所加两弦分别象征？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "书法永字八法涵盖的笔画不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "昆曲被誉为百戏之祖发源于哪个地区？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "儒家三纲指的是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "道家经典道德经又名老子的核心思想可以概括为？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "墨家学派的核心主张是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "宋明理学中程朱理学的核心命题是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "王阳明守仁的心学核心观点是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "古代五谷通常指稻黍稷麦和？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "鼎在古代最初是做什么用的？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "唐代女装流行哪种款式？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "交领右衽是中国传统服饰的重要特征其中右衽指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国传统建筑中斗拱的作用不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "北京故宫紫禁城有多少间房？(传说9999间半)实际约多少？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "苏州四大名园不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中国古典园林造园手法中借景是指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "中医五脏指肝心肺脾和？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "黄帝内经提出的养生原则不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "针灸穴位中被称为四总穴的是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "古人称呼自己常用哪些谦词？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "古人用泰山代称谁的父亲？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "古人以弄璋之喜弄瓦之喜分别指生？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "清明节融合了哪两个节日的习俗？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "重阳节的习俗不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "腊八节喝腊八粥的习俗与哪个宗教有关？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "古代九州中豫州大致对应今天的哪个省？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "关中地区主要指今天的哪里？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "古代江南的概念在不同时期有所变化但最核心的区域一般指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "00后整顿职场这个梗主要调侃什么现象？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "画大饼在职场语境中指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "摸鱼一词在网络语境中指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "PUA被泛化到职场语境中通常指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "内卷一词原为人类学概念网络流行语境中指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "躺平作为一种生活态度的网络表达核心含义是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "35岁危机指的是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "offer收割机形容的是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "YYDS是哪个短语的缩写？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "绝绝子最初源自哪里？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "芭比Q了是什么意思？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "栓Q是哪句英语的谐音？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "我真的会谢表达的是什么情绪？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "尊嘟假嘟是一种什么风格的表达？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "破防了最初来自游戏术语现指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "emo了指代什么状态？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "CPU烧了常用来形容？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "我太难了出自哪位网红的口头禅？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "凡尔赛文学的核心特征是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "电子厂在游戏玩家口中常指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "又菜又爱玩形容的是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "小学生在某些游戏语境中被用作？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "BanPick源自哪种游戏的术语？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "Gank在游戏中指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "皮肤在手游中通常指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "塌房在娱乐语境中指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "唯粉CP粉毒唯分别指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "实绩在饭圈语境中指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "剁手最早与哪个购物节强关联？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "种草拔草分别指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "智商税指购买的商品？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "平替是什么的简称？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "下头的反义词是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "普信男女源自哪里？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "备胎在感情语境中指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "海王在情感语境中指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "上岸在考研考公语境中指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "划水和摸鱼的含义接近吗？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "社恐社牛分别指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "破防在日常使用中最常见的场景是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "摆烂与躺平的区别在于？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "泰裤辣是哪句话的谐音？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "函数f(x)在x0处连续的充要条件是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "当x趋于0时，sinx与x是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "数列{an}收敛的必要条件是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "函数f(x)在x0处可导，则f(x)在x0处一定？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "罗尔定理的条件不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "设f(x)在x0处取得极值且f'(x0)存在，则f'(x0)=？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "曲线y=f(x)在点(x0,y0)处的切线方程为？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "定积分从a到b的f(x)dx的几何意义是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "牛顿-莱布尼茨公式为积分从a到b f(x)dx=？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "不定积分和定积分的关系是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "二元函数z=f(x,y)在某点偏导数存在是否保证在该点连续？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "二重积分在区域D上dσ的几何意义是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "格林公式的适用条件要求区域D是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "一阶线性微分方程dy/dx+P(x)y=Q(x)的通解公式中积分因子μ(x)=？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "微分方程y''+py'+qy=0的特征方程有两个不等实根r1不等于r2时，通解为？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "正项级数求和an收敛的必要条件是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "幂级数求和an*(x-x0)^n的收敛域一定是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "n阶行列式|A|=0的充要条件是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "交换行列式的两行(列)，行列式的值？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "矩阵A可逆的充要条件是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "若AB=E(E为单位矩阵)，则A的逆矩阵=？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "矩阵的初等变换不改变矩阵的？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "向量组线性相关的定义是存在不全为零的数k1...ks使得？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "n个n维向量线性无关的充要条件是由它们构成的矩阵的行列式？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "向量组的极大无关组所含向量的个数称为该向量组的？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "方阵A的特征值λ满足|λE-A|=0，该方程称为A的？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "相似矩阵具有相同的？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "二次型f=x^T*A*x正定的充要条件是A的所有特征值？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "事件A与B互斥(互不相容)是指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "条件概率P(A|B)的定义式为(P(B)>0)？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "离散型随机变量X的概率分布满足？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "若X服从N(μ,σ²)，则(X-μ)/σ服从什么分布？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "随机变量X的方差D(X)=E[(X-E(X))²]也可表示为？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "若X与Y独立，则协方差cov(X,Y)=？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "伯努利大数定律表明：当n趋于无穷时，事件A发生的频率fn(A)依概率收敛于？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "设X1...Xn是来自总体N(μ,σ²)的样本，则样本均值X̄服从？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "矩估计法的基本思想是用样本矩估计？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "最大似然估计的基本思想是选择使似然函数达到最大的参数值作为未知参数的估计。对吗？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "假设检验中，第一类错误(弃真)的概率等于？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "在显著性水平α下拒绝原假设H₀意味着？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "空间两平面平行的充要条件是它们的法向量？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "空间直线的一般方程由两个平面的联立表示，其方向向量等于？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "椭球面x²/a²+y²/b²+z²/c²=1的三个半轴长分别为？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "在一个长度为n的顺序表中，删除第i个元素需要移动多少个元素？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "单链表中，已知p指向某节点，在p之后插入s节点的操作步骤是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "一个栈的入栈序列是1,2,3,4,5，则不可能的出栈序列是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "循环队列中，判断队满的条件（采用牺牲一个空间区分队空队满）是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "具有n个结点的完全二叉树的深度为？(log₂n向下取整+1)",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "一棵有124个叶结点的完全二叉树最多有多少个结点？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "二叉树的前序遍历序列和中序遍历序列能否唯一确定一棵二叉树？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "对于一个有n个顶点e条边的无向图，邻接表需要进行多少次边操作才能完成深度优先遍历？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "用Prim算法和Kruskal算法构造最小生成树，两者的时间复杂度分别为？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "快速排序在最坏情况下的时间复杂度为？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "以下哪种排序算法是稳定的？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "对有序表进行折半查找，其ASL(平均查找长度)为？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "8位补码表示的有符号整数范围是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "浮点数的IEEE 754标准中，单精度浮点数占多少位？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "Cache的映射方式中，直接映射的特点是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "虚拟存储器的基础是程序的什么特性？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "指令寻址和数据寻址的主要区别在于？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "流水线技术中，流水线的加速比定义为？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "同步通信和异步通信的主要区别是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "DMA方式的优点是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "进程的三种基本状态不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "进程间通信(IPC)的方式不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "死锁产生的四个必要条件中，破坏哪个条件可以预防死死锁且最常用？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "页式存储管理中，逻辑地址到物理地址的转换是通过什么完成的？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "页面置换算法中，Belady异常可能出现在哪种算法中？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "文件的逻辑结构包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "UNIX/Linux系统中，inode包含的信息不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "Spooling技术（假脱机）将独占设备改造为？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "OSI参考模型共分为几层？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "TCP/IP模型中，IP协议工作在哪一层？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "奈奎斯特定理指出：理想低通信道的最高码元传输速率为2W Baud，其中W指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "以太网使用的介质访问控制方法是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "PPP协议的特点不包括？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "IP地址192.168.1.100属于哪类地址？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "子网掩码255.255.255.0对应的网络部分占多少位？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "RIP协议使用什么作为度量(metric)？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "TCP三次握手中，第二次握手报文段的标志位应设置为？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "UDP相比TCP的优势是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "TCP的滑动窗口协议主要用于？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "HTTP默认使用的端口号是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "DNS协议主要使用哪种传输层协议？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "SMTP协议用于？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "HTTPS在HTTP基础上增加了什么来保障安全？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "关系数据库中的「关系」指的是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "SQL中用于修改数据的语句是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "数据库事务的ACID特性中，I(Isolation)指？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "词法分析器的输出是？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    },
+    {
+      "query": "语法分析方法分为自顶向下分析和？",
+      "label": 0,
+      "source": "xlsx",
+      "passed": true,
+      "reason": null
+    }
+  ]
+}

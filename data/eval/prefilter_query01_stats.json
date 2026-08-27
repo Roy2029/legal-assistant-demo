@@ -1,0 +1,18 @@
+{
+  "file": "data\\eval\\prefilter_query01.jsonl",
+  "total": 2782,
+  "label_dist": {
+    "legal(1)": 2375,
+    "non_legal(0)": 407
+  },
+  "source_dist": {
+    "xlsx": 528,
+    "qa": 2254
+  },
+  "xlsx_labels": {
+    "1": 123,
+    "0": 407
+  },
+  "qa_count": 2254,
+  "note": "label: 1=法律问题(应放行), 0=非法律问题(应拦截)。QA queries 全部来自 QA_dataset/法律/queries.json。"
+}
