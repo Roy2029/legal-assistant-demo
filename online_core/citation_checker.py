@@ -107,10 +107,9 @@ class CitationChecker:
         self._client = None
 
     def _get_client(self):
-        if self._client is None:
-            from qdrant_client import QdrantClient
-            self._client = QdrantClient(path=self.index_path)
-        return self._client
+        # 统一走检索服务单例共享 QdrantClient（本地嵌入式 Qdrant 同一目录只允许一个 client）
+        from online_core.retrieval_service import get_retrieval_service
+        return get_retrieval_service()._get_store()
 
     def verify(self, text: str) -> CitationCheckResult:
         citations = extract_citations(text)
@@ -128,16 +127,17 @@ class CitationChecker:
 
     def _exists(self, law_name: str, article_no: str) -> bool:
         try:
-            from qdrant_client import models
-            client = self._get_client()
-            f = models.Filter(
-                must=[
-                    models.FieldCondition(key="metadata.law_name", match=models.MatchValue(value=law_name)),
-                    models.FieldCondition(key="metadata.articles", match=models.MatchAny(any=[article_no])),
-                ]
+            store = self._get_client()
+            chunks, _ = store.scroll_paginated(
+                filter_condition={
+                    "must": [
+                        {"key": "metadata.law_name", "match": {"value": law_name}},
+                        {"key": "metadata.articles", "match": {"any": [article_no]}},
+                    ]
+                },
+                limit=1,
             )
-            pts, _ = client.scroll(collection_name="chunks", scroll_filter=f, limit=1)
-            return len(pts) > 0
+            return len(chunks) > 0
         except Exception:
             return False
 

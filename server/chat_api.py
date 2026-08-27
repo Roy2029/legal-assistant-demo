@@ -3,30 +3,19 @@ from __future__ import annotations
 
 import json
 import uuid
-from pathlib import Path
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
 from .config_service import config_service
-from .llm import LLMNotConfiguredError, llm_client
-from online_core.retrieval_service import RetrievalService, RetrievalConfig
+from .llm import llm_client
+from online_core.retrieval_service import get_retrieval_service
 from online_core.citation_checker import CitationChecker
 
 router = APIRouter(prefix="/api")
 
-# 服务实例（懒加载）
-_retrieval = None
+# 引用校验器（懒加载；检索服务统一走 online_core.get_retrieval_service 单例，避免 Qdrant 锁冲突）
 _citation = None
-
-
-def get_retrieval() -> RetrievalService:
-    global _retrieval
-    if _retrieval is None:
-        _retrieval = RetrievalService(
-            RetrievalConfig(index_path=str(Path("D:/个人/legal-assistant-demo/data/indices/法律/qdrant")))
-        )
-    return _retrieval
 
 
 def get_citation() -> CitationChecker:
@@ -70,10 +59,26 @@ SYSTEM_PROMPT = """你是一名法律研究助手。只能依据提供的检索�
 4. 不使用外部知识补充法条内容。"""
 
 DISCLAIMER = "\n\n---\n本回答由 AI 生成，不构成正式法律意见，使用前须经执业律师核阅。"
+DISCLAIMER_TEXT = "本回答由 AI 生成，不构成正式法律意见，使用前须经执业律师核阅。"
+
+
+def strip_disclaimer(text: str) -> str:
+    """去掉 LLM 可能从历史中复制出来的免责声明，避免后端再追加一次导致重复。"""
+    import re
+    lines = []
+    for line in text.splitlines():
+        if "本回答由 AI 生成" in line and "不构成正式法律意见" in line:
+            continue
+        lines.append(line)
+    text = "\n".join(lines).strip()
+    # 去掉紧贴免责声明前的分隔线（仅末尾）
+    text = re.sub(r"\n*-{3,}\s*$", "", text).rstrip()
+    return text
+
 
 
 def build_context(query: str) -> tuple[str, dict]:
-    svc = get_retrieval()
+    svc = get_retrieval_service()
     out = svc.search(query)
     target_article = None
     try:
@@ -181,7 +186,7 @@ async def event_gen(query: str, session_id: str):
         suffix = "\n\n⚠️ 以下引用未能验证，请核实：\n" + "\n".join(f"- {c.raw}" for c in result.unverifiable)
         yield f"data: {json.dumps({'type': 'citation_check', 'unverifiable': [c.raw for c in result.unverifiable]}, ensure_ascii=False)}\n\n"
 
-    final = restore(answer + suffix) + DISCLAIMER
+    final = strip_disclaimer(restore(answer + suffix)) + DISCLAIMER
 
     # 持久化本轮消息（M1 会话管理）
     try:

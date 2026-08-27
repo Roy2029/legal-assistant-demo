@@ -260,24 +260,22 @@ class LegalDocxParser(DocxParser):
     # ── 自动检测 ──────────────────────────────────────────────
 
     def detect(self, file_path: str) -> bool:
-        """检测是否为法律文档：扫描前 20 非空段落，章/节/条模式命中率 >30%。"""
+        """检测是否为法律文档：非空段落 ≥2 即认可。
+
+        语料已按来源预筛选为法律文件，此门只用于挡开空文档/纯封面，
+        不应按条文格式设阈值。旧启发式（前 20 段章/节/条命中率 >30%）
+        会误伤两类合法文件：
+          - 前几条含长分点/续段的税法（命中率被稀释，如个人所得税法）；
+          - 以「一、二、三」编号而非「第X条」的 决定/规定/决议。
+        """
         doc = Document(file_path)
-        matches = 0
         non_empty = 0
         for para in doc.paragraphs:
-            text = para.text.strip()
-            if not text:
-                continue
-            non_empty += 1
-            if (
-                _RE_CHAPTER.match(text)
-                or _RE_SECTION.match(text)
-                or _RE_ARTICLE.match(text)
-            ):
-                matches += 1
-            if non_empty >= 20:
-                break
-        return non_empty > 0 and matches / non_empty > 0.3
+            if para.text.strip():
+                non_empty += 1
+            if non_empty >= 2:
+                return True
+        return False
 
     # ── 标题检测（覆盖） ──────────────────────────────────────
 

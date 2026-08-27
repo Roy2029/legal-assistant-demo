@@ -32,7 +32,17 @@ def _default_config() -> dict[str, Any]:
     return {
         "llm": llm_env,
         "desensitize": {"enabled": True, "level": "standard"},
-        "retrieval": {"top_k": 8, "recall_top_k": 50},
+        "retrieval": {
+            "top_k": 8,
+            "recall_top_k": 50,
+            "embedding_device": "cpu",
+            "reranker_provider": "skip",  # skip | local | api
+            "reranker_model": "D:/个人/Research/RAG1.0/local_model/bge-reranker-v2-m3",
+            "reranker_api_url": "",
+            "reranker_api_key": "",
+            "reranker_api_model": "bge-reranker-v2-m3",
+            "enable_rerank": False,
+        },
     }
 
 class ConfigService:

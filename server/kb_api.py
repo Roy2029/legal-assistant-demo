@@ -13,9 +13,17 @@ from offline_core.manifest import compute_doc_id
 from offline_core.chunker_v2 import LegalStructureChunker
 from offline_core.data_model import HeadingBlock, ParagraphBlock, StructuredDocument
 from offline_core.embedder import Embedder
-from offline_core.store import QdrantStore
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_tokenizer = None
+
+
+def _get_tokenizer():
+    global _tokenizer
+    if _tokenizer is None:
+        from transformers import AutoTokenizer
+        _tokenizer = AutoTokenizer.from_pretrained("D:/个人/Research/RAG1.0/local_model/bge-base-zh")
+    return _tokenizer
 UPLOAD_DIR = PROJECT_ROOT / "data" / "uploads"
 PARSED_DIR = PROJECT_ROOT / "data" / "parsed"
 DEFAULT_KB_ID = "default"
@@ -103,9 +111,7 @@ async def upload(file: UploadFile = File(...), kb_id: str = DEFAULT_KB_ID):
     emb = svc._get_embedding()
     store = svc._get_store()
 
-    from transformers import AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained("D:/个人/Research/RAG1.0/local_model/bge-base-zh")
-    chunker = LegalStructureChunker(tokenizer=tokenizer)
+    chunker = LegalStructureChunker(tokenizer=_get_tokenizer())
     meta = {
         "corpus": "user",
         "user_id": USER_ID,

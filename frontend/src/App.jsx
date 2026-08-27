@@ -14,11 +14,14 @@ function ChunkList({ items, onOpenFull }) {
             <Space size={4} wrap>
               <Text strong style={{ fontSize: 12 }}>#{i + 1}</Text>
               <Tag color="blue">{c.meta?.law_name || '未知'}{c.meta?.article_no ? ' 第' + c.meta.article_no + '条' : ''}</Tag>
+              {c.meta?.heading_path?.length > 0 && c.meta.heading_path[c.meta.heading_path.length - 1] !== c.meta.law_name && (
+                <Tag color="cyan">{c.meta.heading_path[c.meta.heading_path.length - 1]}</Tag>
+              )}
               <Tag>{c.meta?.chunk_level || '-'}</Tag>
               {c.meta?.corpus && <Tag color={c.meta.corpus === 'user' ? 'orange' : 'green'}>{c.meta.corpus}</Tag>}
               <Text type="secondary" style={{ fontSize: 11 }}>score={c.score}</Text>
             </Space>
-            <Button size="small" type="link" onClick={() => onOpenFull && onOpenFull(c)}>全文</Button>
+            <Button size="small" type="link" onClick={() => onOpenFull && onOpenFull(c)}>查看原文</Button>
           </div>
           <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap', maxHeight: 80, overflow: 'hidden', marginTop: 4 }}>{c.text}</pre>
         </Card>
@@ -65,9 +68,20 @@ function ChatPage() {
   const [fullChunk, setFullChunk] = useState(null)
 
   async function openFullChunk(c) {
-    const r = await fetch('/api/chunk/' + encodeURIComponent(c.chunk_id))
-    const d = await r.json()
-    setFullChunk(d.ok ? d.data : { text: c.text, law_name: c.meta?.law_name, article_no: c.meta?.article_no, chunk_id: c.chunk_id })
+    try {
+      const r = await fetch('/api/chunk/' + encodeURIComponent(c.chunk_id))
+      const d = await r.json()
+      if (d.ok) { setFullChunk(d.data); return }
+      setFullChunk({
+        text: (c.text || '') + '\n\n[全文加载失败：' + (d.error?.message || '未知错误') + '，以下为截断预览]',
+        law_name: c.meta?.law_name, article_no: c.meta?.article_no, chunk_id: c.chunk_id,
+      })
+    } catch (e) {
+      setFullChunk({
+        text: (c.text || '') + '\n\n[全文加载失败：' + e.message + '，以下为截断预览]',
+        law_name: c.meta?.law_name, article_no: c.meta?.article_no, chunk_id: c.chunk_id,
+      })
+    }
   }
   const abortRef = useRef(null)
 
@@ -200,6 +214,10 @@ function ChatPage() {
             {
               key: 'final', label: `最终上下文（RRF top-${trace.final_count}，难度：${trace.difficulty?.level || '-'}）`,
               children: <ChunkList items={trace.final_topk || []} onOpenFull={openFullChunk} />,
+            },
+            {
+              key: 'rrf_raw', label: `RRF 原始 top-10（未按难度截断）`,
+              children: <ChunkList items={trace.rrf_raw_topk || []} onOpenFull={openFullChunk} />,
             },
             { key: 'parsed', label: 'Query 解析', children: <pre style={{ fontSize: 12 }}>{JSON.stringify(trace.parsed, null, 2)}</pre> },
             { key: 'difficulty', label: '难度分档', children: <pre style={{ fontSize: 12 }}>{JSON.stringify(trace.difficulty, null, 2)}</pre> },
@@ -366,19 +384,31 @@ function AssistantPage() {
 function KbPage() {
   const [docs, setDocs] = useState([])
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState('')
 
   function loadDocs() {
     fetch('/api/kb/docs').then((r) => r.json()).then((d) => setDocs(d.data || []))
   }
   useEffect(() => { loadDocs() }, [])
 
-  async function upload(file) {
-    setUploading(true)
+  async function uploadOne(file) {
     const fd = new FormData()
     fd.append('file', file)
     const r = await fetch('/api/kb/upload', { method: 'POST', body: fd })
     const d = await r.json()
-    if (d.ok) { message.success(`已上传：${d.data.name}（${d.data.children} chunks）`) } else { message.error(d.error?.message || '上传失败') }
+    if (d.ok) { message.success(`已上传：${d.data.name}（${d.data.children} chunks）`) } else { message.error(`${file.name}: ` + (d.error?.message || '上传失败')) }
+  }
+
+  async function uploadFiles(fileList) {
+    const files = Array.from(fileList || [])
+    if (!files.length || uploading) return
+    setUploading(true)
+    let ok = 0
+    for (let i = 0; i < files.length; i++) {
+      setUploadProgress(`上传中 ${i + 1}/${files.length}: ${files[i].name}`)
+      try { await uploadOne(files[i]); ok++ } catch (e) { message.error(`${files[i].name}: ` + e.message) }
+    }
+    setUploadProgress(`完成：${ok}/${files.length} 个文件`)
     setUploading(false)
     loadDocs()
   }
@@ -392,8 +422,17 @@ function KbPage() {
   return (
     <Card title="知识库管理" size="small">
       <Space direction="vertical" style={{ width: '100%' }}>
-        <input type="file" accept=".md,.txt,.docx,.pdf" onChange={(e) => { if (e.target.files[0]) upload(e.target.files[0]) }} disabled={uploading} />
-        <Text type="secondary">支持 md / txt / docx / pdf（扫描件暂不支持）</Text>
+        <Space wrap>
+          <Button onClick={() => document.getElementById('kb-file-input').click()} disabled={uploading}>选择多个文件</Button>
+          <Button onClick={() => document.getElementById('kb-folder-input').click()} disabled={uploading}>上传整个文件夹</Button>
+          {uploading && <Tag color="blue">{uploadProgress}</Tag>}
+          {!uploading && uploadProgress && <Text type="secondary">{uploadProgress}</Text>}
+        </Space>
+        <input id="kb-file-input" type="file" accept=".md,.txt,.docx,.pdf" multiple style={{ display: 'none' }}
+          onChange={(e) => { uploadFiles(e.target.files); e.target.value = '' }} />
+        <input id="kb-folder-input" type="file" webkitdirectory="" directory="" multiple style={{ display: 'none' }}
+          onChange={(e) => { uploadFiles(e.target.files); e.target.value = '' }} />
+        <Text type="secondary">支持 md / txt / docx / pdf（扫描件暂不支持）；可多选文件或整个文件夹上传</Text>
         <List size="small" dataSource={docs} renderItem={(d) => (
           <List.Item actions={[<Button size="small" danger onClick={() => remove(d.doc_id)}>删除</Button>]}>
             <Text>{d.file_path?.replace(/.*[\/]/, '')}</Text>

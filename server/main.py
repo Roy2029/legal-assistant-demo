@@ -1,4 +1,6 @@
 """FastAPI 应用入口（M0 W1 骨架）。"""
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -37,6 +39,31 @@ register_error_handlers(app)
 @app.on_event("startup")
 def on_startup():
     init_db()
+    # 启动即预加载 embedding + Qdrant store + BM25 encoder + 内置法律词典。
+    # 避免首次提问才加载模型（迭代需求 #2），也避免各模块各自 new QdrantClient
+    # 触发本地嵌入式 Qdrant 的 AlreadyLocked（迭代需求 #3）。
+    try:
+        from online_core.retrieval_service import RetrievalConfig, configure_retrieval
+        rc = config_service.load().get("retrieval", {})
+        config = RetrievalConfig(
+            index_path=str(Path("D:/个人/legal-assistant-demo/data/indices/法律/qdrant")),
+            embedding_model=rc.get("embedding_model") or "D:/个人/Research/RAG1.0/local_model/bge-base-zh",
+            embedding_device=rc.get("embedding_device") or "cpu",
+            reranker_model=rc.get("reranker_model") or "D:/个人/Research/RAG1.0/local_model/bge-reranker-v2-m3",
+            reranker_provider=rc.get("reranker_provider") or "skip",
+            reranker_api_url=rc.get("reranker_api_url") or "",
+            reranker_api_key=rc.get("reranker_api_key") or "",
+            reranker_api_model=rc.get("reranker_api_model") or "bge-reranker-v2-m3",
+            enable_rerank=bool(rc.get("enable_rerank", False)),
+            recall_top_k=int(rc.get("recall_top_k", 50)),
+        )
+        svc = configure_retrieval(config)
+        svc._get_store()  # 预加载 embedding + store（含 BM25 encoder）
+        from online_core.lexicon_service import load_builtin_lexicon
+        load_builtin_lexicon()
+        print(f"[startup] 检索服务预加载完成 embedding={config.embedding_device} reranker={config.reranker_provider}")
+    except Exception as e:
+        print(f"[startup] 检索服务预加载失败（将在首次查询时重试）: {e}")
 
 
 @app.get("/health")

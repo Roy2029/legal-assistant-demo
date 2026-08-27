@@ -85,3 +85,13 @@
 
 - W1：✅ 完成（见 CHANGELOG）
 - W2：进行中——重建索引第三次（修复 article_no）运行中
+
+## 迭代需求处理（2026-08-27 试用反馈）
+
+- 处理 `docs/草稿/迭代需求.md` 8 条：硬件适配（embedding CPU / reranker skip|local|api）、启动预加载、Qdrant AlreadyLocked 根治（chunk_api/citation_checker 全走单例）、免责声明去重、PreFilter 评估 40/40、chunker_v2 审查、chunk 全文预览修复、知识库多选/文件夹上传
+- 检索链路评估：新 qrels 经 remap 后（`data/QA_dataset/法律/qrels_v2.json`，chunker_v2 child 级）评估 2,218 条 query
+  - 固定 K=10：Hit 0.9743 / MRR 0.9209 / Recall 0.8046 / NDCG 0.8265
+  - 链路最终（难度自适应截断）：Recall@10 0.8209 / NDCG@10 0.8636
+  - 分难度：hard/medium 表现接近，simple 组 recall 偏低（qrels 多标签分母大）
+- 全量测试：39 passed
+- 经验：① FastAPI 路由 `/locate` 必须注册在 `/{chunk_id}` 之前，否则被动态路由吞掉；② CitationChecker 与 chunk_api 一样不能自己 new QdrantClient；③ LLM 会从历史里学免责声明，后端追加前先 strip 一次

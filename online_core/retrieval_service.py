@@ -26,8 +26,13 @@ class RetrievalConfig:
     index_path: str = str(Path("D:/个人/legal-assistant-demo/data/indices/法律/qdrant"))
     collection: str = "chunks"
     embedding_model: str = DEFAULT_EMBEDDING
+    embedding_device: str = "cpu"  # 普通用户默认 CPU；embedding 与索引构建同模型，CPU 单条查询 <1s
     reranker_model: str = DEFAULT_RERANKER
-    device: str = "cuda"
+    reranker_provider: str = "skip"  # skip | local | api
+    reranker_api_url: str = ""       # api provider 的 rerank 端点（OpenAI 兼容 /rerank）
+    reranker_api_key: str = ""       # api provider 的密钥；为空时回退 LLM_API_KEY
+    reranker_api_model: str = "bge-reranker-v2-m3"  # 云上 rerank 模型名
+    device: str = "cpu"  # 兼容旧字段：统一默认 CPU，避免低显存机器 OOM
     enable_rerank: bool = False  # M0 关闭：4GB 显卡可用显存不足且 CPU 长文本 rerank 过慢；M2 量化/裁剪候选后重开
     recall_top_k: int = 50
 
@@ -49,10 +54,23 @@ class RetrievalService:
         self._method: Optional[HybridMethod] = None
         self._reranker = None
 
+    def close(self):
+        """关闭底层 QdrantClient，释放嵌入式 Qdrant 文件锁（供重配/测试复用）。"""
+        try:
+            if self._store is not None:
+                self._store.close()
+        except Exception:
+            pass
+        self._store = None
+        self._method = None
+        self._reranker = None
+
     def _get_embedding(self):
         if self._embedding is None:
-            # embedding 放 CPU：编码单条 query <1s；GPU 留给 reranker（两模型同占 GPU 会显存争抢卡死）
-            self._embedding = HuggingFaceEmbeddingModel(model_name=self.config.embedding_model, device="cpu")
+            # embedding 默认 CPU（D02 §8.2 接口方案）：编码单条 query <1s；
+            # 索引构建用 GPU batch 已完成，查询期 CPU 足够，避免两模型争抢显存。
+            device = self.config.embedding_device or "cpu"
+            self._embedding = HuggingFaceEmbeddingModel(model_name=self.config.embedding_model, device=device)
         return self._embedding
 
     def _get_store(self):
@@ -76,9 +94,20 @@ class RetrievalService:
 
     def _get_reranker(self):
         if self._reranker is None and self.config.enable_rerank:
-            from online_core.reranker import CrossEncoderReranker
-            # GTX 1650 4GB 实测可用显存仅约 1.2GB，FP32 reranker 放不下；CPU 30 对约 10s 可接受
-            self._reranker = CrossEncoderReranker(model_path=self.config.reranker_model, device="cpu", use_fp16=False)
+            provider = (self.config.reranker_provider or "skip").lower()
+            if provider == "api":
+                from online_core.reranker import APIReranker
+                self._reranker = APIReranker(
+                    api_url=self.config.reranker_api_url,
+                    api_key=self.config.reranker_api_key,
+                    model=self.config.reranker_api_model,
+                )
+            elif provider == "local":
+                from online_core.reranker import CrossEncoderReranker
+                # GTX 1650 4GB 实测可用显存仅约 1.2GB，FP32 reranker 放不下；CPU 30 对约 10s 可接受
+                self._reranker = CrossEncoderReranker(model_path=self.config.reranker_model, device="cpu", use_fp16=False)
+            else:
+                self._reranker = None
         return self._reranker
 
     def search(self, query: str, corpus_scope: str = "all") -> RetrievalOutput:
@@ -121,8 +150,13 @@ class RetrievalService:
         from offline_core.store import SearchQuery
         dense_sq = SearchQuery(text=query, dense_vector=qvec, mode="dense", filters=filters)
         sparse_sq = SearchQuery(text=query, mode="sparse", filters=filters)
-        dense_results = store.search(dense_sq, top_k=top_k)
-        sparse_results = store.search(sparse_sq, top_k=top_k)
+        # 并行 dense/sparse：Qdrant 嵌入式模式单路查询约 0.5-1s，串行会翻倍
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=2) as ex:
+            dense_future = ex.submit(store.search, dense_sq, top_k)
+            sparse_future = ex.submit(store.search, sparse_sq, top_k)
+            dense_results = dense_future.result()
+            sparse_results = sparse_future.result()
         raw = HybridMethod._rrf_fuse([dense_results, sparse_results], top_k)
         import jieba
         bm25_tokens = jieba.lcut(query)
@@ -135,6 +169,7 @@ class RetrievalService:
                 "chunk_level": r.chunk.chunk_level,
                 "corpus": m.get("corpus", ""),
                 "doc_type": m.get("doc_type", ""),
+                "heading_path": r.chunk.heading_path or [],
             }
 
         dense_topk = [{"chunk_id": r.chunk.chunk_id, "score": round(float(r.score), 4), "text": r.chunk.text[:120], "meta": _meta(r)} for r in dense_results[:10]]
@@ -151,8 +186,10 @@ class RetrievalService:
         else:
             results = raw[: diff["top_k"]]
         # 7. 父子召回：命中 child → 返回 parent（M0：service 层标记，上层决定取 parent 文本）
+        rrf_raw_topk = [{"chunk_id": r.chunk.chunk_id, "score": round(float(r.score), 4), "text": r.chunk.text[:120], "meta": _meta(r)} for r in raw[:10]]
         final_topk = [{"chunk_id": r.chunk.chunk_id, "score": round(float(r.score), 4), "text": r.chunk.text[:120], "meta": _meta(r)} for r in results]
         trace = {
+            "rrf_raw_topk": rrf_raw_topk,
             "final_topk": final_topk,
             "parsed": {
                 "law_name": pq.law_name,
@@ -195,6 +232,21 @@ class RetrievalService:
 
 
 _service: Optional[RetrievalService] = None
+_configured: bool = False
+
+
+def configure_retrieval(config: RetrievalConfig) -> RetrievalService:
+    """用自定义配置初始化（或重置）全局检索服务单例。
+
+    服务器启动时调用一次，避免各 API 模块各自创建 QdrantClient 导致
+    本地嵌入式 Qdrant 的 AlreadyLocked 冲突。
+    """
+    global _service, _configured
+    if _service is not None:
+        _service.close()
+    _service = RetrievalService(config)
+    _configured = True
+    return _service
 
 
 def get_retrieval_service() -> RetrievalService:

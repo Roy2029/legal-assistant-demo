@@ -23,11 +23,20 @@ from .data_model import (
 )
 
 # ── 分点条款识别 ──────────────────────────────────────────────────
+# 引导语 = "第X条 + 引导句"，必须**有界**：不跨条文、不跨句，到冒号为止。
+# 旧版贪婪尾 [^（(]* 会在节内深埋引导语时跨条吸收多篇条文，使 guide 变成
+# 整节前缀并被重复塞进每个 child（D01 §3.5 首部保留的边界问题）。
 GUIDE_RE = re.compile(
-    r"第[一二三四五六七八九十百零\d]+条[^（(]*?(?:有下列情形之一的|符合下列条件之一的|符合下列情形之一的|应当认定|按照下列)[^（(]*[：:]"
+    r"第[一二三四五六七八九十百零\d]+条"
+    r"(?:(?!第[一二三四五六七八九十百零\d]+条).)*?"      # 惰性扫描，不跨入下一条
+    r"(?:有下列情形之一的|符合下列条件之一的|符合下列情形之一的|应当认定|按照下列)"
+    r"(?:(?!第[一二三四五六七八九十百零\d]+条)[^（(。；;])*[：:]"  # 引导句到冒号为止
 )
 ITEM_RE = re.compile(r"[（(]\s*([一二三四五六七八九十百零\d]+)\s*[)）]")
 ARTICLE_CN_RE = re.compile(r"第([一二三四五六七八九十百零千]+)条")
+# 条文边界：段落起始处的"第X条"（与解析器 ParagraphBlock 对齐），
+# 避免把正文中"依照本法第X条"的引用误判为边界。
+ARTICLE_BOUNDARY_RE = re.compile(r"(?:^|\n\s*\n)\s*第[一二三四五六七八九十百零千\d]+条")
 TABLE_LINE_RE = re.compile(r"^\s*\|.*\|\s*$")
 
 
@@ -204,12 +213,46 @@ class LegalStructureChunker:
         # 1) 表格文本：按行切，每块重复表头（简易版）
         if self._is_table_text(text):
             return self._split_table(text)
-        # 2) 分点条款：截断 + 补首部引导语
+        # 2) 按条文边界切分（逐条独立处理：分点条款 / 递归切分）。
+        #    先在"条"粒度上切，避免整节被单个深埋引导语劫持成超大首部（D01 §3.3/3.5）。
+        article_chunks = self._split_by_articles(text)
+        if article_chunks is not None:
+            return article_chunks
+        # 3) 非条文结构：整段尝试有界分点条款 → 否则递归切分
         guide, items = self._extract_items(text)
         if guide and len(items) >= 2:
             return self._split_items(guide, items)
-        # 3) 递归切分：自然段落 → 自然句 → 硬切分
         return self._split_recursive(text)
+
+    def _split_by_articles(self, text: str) -> Optional[List[str]]:
+        """把节按条文边界拆成条文序列，逐条独立切分。
+
+        条文边界 = 段落起始处的"第X条"。非条文结构（<2 个边界）返回 None。
+        """
+        matches = list(ARTICLE_BOUNDARY_RE.finditer(text))
+        if len(matches) < 2:
+            return None
+        segments: List[str] = []
+        if matches[0].start() > 0:
+            segments.append(text[: matches[0].start()])  # 首条之前的序言
+        for i, m in enumerate(matches):
+            end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+            segments.append(text[m.start() : end])
+        out: List[str] = []
+        for seg in segments:
+            seg = seg.strip()
+            if seg:
+                out.extend(self._split_segment(seg))
+        return out
+
+    def _split_segment(self, seg: str) -> List[str]:
+        """处理一个条文段（或序言段）：短则保留，分点条款则拆分，否则递归切分。"""
+        if self._token_len(seg) <= self.L_child:
+            return [seg]
+        guide, items = self._extract_items(seg)
+        if guide and len(items) >= 2:
+            return self._split_items(guide, items)
+        return self._split_recursive(seg)
 
     def _is_table_text(self, text: str) -> bool:
         lines = [ln for ln in text.splitlines() if ln.strip()]
@@ -255,8 +298,14 @@ class LegalStructureChunker:
         return guide, items
 
     def _split_items(self, guide: str, items: List[str]) -> List[str]:
-        """按分点均分成若干块，每块携带首部引导语。"""
+        """按分点均分成若干块，每块携带首部引导语。
+
+        兜底（D01 §3.5）：引导语自身超长时整体递归切分；
+        单个分点超长时仅对该分点递归切分，每段仍携带引导语。
+        """
         guide_len = self._token_len(guide)
+        if guide_len > self.L_child:
+            return self._split_recursive(guide + "".join(items))
         chunks: List[str] = []
         cur_items: List[str] = []
         cur_len = guide_len
@@ -271,7 +320,22 @@ class LegalStructureChunker:
                 cur_len += it_len
         if cur_items:
             chunks.append(guide + "".join(cur_items))
-        return chunks or [guide]
+        if not chunks:
+            chunks = [guide]
+        # 超长块兜底：仅对超长的 items 部分递归切分，每段仍带引导语
+        result: List[str] = []
+        for ch in chunks:
+            if self._token_len(ch) <= self.L_child * 1.2:
+                result.append(ch)
+                continue
+            items_part = ch[len(guide):] if ch.startswith(guide) else ch
+            for piece in self._split_recursive(items_part):
+                cand = guide + piece
+                if self._token_len(cand) <= self.L_child * 1.2:
+                    result.append(cand)
+                else:
+                    result.extend(self._split_recursive(cand))
+        return result
 
     def _split_recursive(self, text: str, depth: int = 0) -> List[str]:
         """自然段落 → 自然句 → 硬切分，选最接近中点，均分原则。"""

@@ -12,6 +12,50 @@ from offline_core.data_model import RetrievalResult
 logger = logging.getLogger(__name__)
 
 
+class APIReranker:
+    """云 API 重排器（OpenAI 兼容 /rerank 端点，如 SiliconFlow/Jina/Cohere 兼容网关）。
+
+    接口方案（迭代需求 #1）：
+    - skip  : 不重排（默认，低配机器推荐）
+    - local : 本地 bge-reranker-v2-m3（CPU 推理，候选 <= 30 时可用）
+    - api   : 云 rerank API，需配置 reranker_api_url / reranker_api_key / reranker_api_model
+    """
+
+    def __init__(self, api_url: str = "", api_key: str = "", model: str = "bge-reranker-v2-m3", timeout: int = 30):
+        import os
+
+        self.api_url = (api_url or "").strip().rstrip("/")
+        self.api_key = (api_key or "").strip() or os.getenv("RERANK_API_KEY", "") or os.getenv("LLM_API_KEY", "")
+        self.model = model or "bge-reranker-v2-m3"
+        self.timeout = timeout
+        if not self.api_url:
+            raise ValueError("reranker_provider=api 需要配置 reranker_api_url（OpenAI 兼容 /rerank 端点）")
+
+    def rerank(self, query: str, candidates: list[RetrievalResult], top_k: int) -> list[RetrievalResult]:
+        import requests
+
+        if not candidates:
+            return []
+        payload = {
+            "model": self.model,
+            "query": query,
+            "documents": [c.chunk.text for c in candidates],
+            "top_n": top_k,
+        }
+        headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+        url = self.api_url if self.api_url.endswith("/rerank") else self.api_url + "/rerank"
+        resp = requests.post(url, json=payload, headers=headers, timeout=self.timeout)
+        resp.raise_for_status()
+        data = resp.json()
+        results_data = data.get("results") or []
+        scores = {r.get("index"): float(r.get("relevance_score", 0.0)) for r in results_data}
+        for i, c in enumerate(candidates):
+            c.score = scores.get(i, 0.0)
+            c.retrieval_type = "rerank_api"
+        candidates.sort(key=lambda x: x.score, reverse=True)
+        return candidates[:top_k]
+
+
 class CrossEncoderReranker:
     """Cross-Encoder 重排器。
 
