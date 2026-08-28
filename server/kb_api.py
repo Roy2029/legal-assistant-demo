@@ -213,7 +213,7 @@ def doc_chunks(doc_id: str):
         store = svc._get_store()
         chunks, _ = store.scroll_paginated(
             filter_condition={"must": [{"key": "doc_id", "match": {"value": doc_id}}]},
-            limit=100,
+            limit=500,
         )
         data = []
         for ch in chunks:
