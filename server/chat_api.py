@@ -77,9 +77,17 @@ def strip_disclaimer(text: str) -> str:
 
 
 
-def build_context(query: str) -> tuple[str, dict]:
+def build_context(query: str, folders: list[str] | None = None) -> tuple[str, dict]:
     svc = get_retrieval_service()
-    out = svc.search(query)
+    corpus_scope = "all"
+    user_folders = None
+    if folders:
+        if folders == ["__public__"]:
+            corpus_scope = "public"
+        else:
+            # 只支持单选公共库或多选用户文件夹；混选时按用户文件夹处理
+            user_folders = [f for f in folders if f != "__public__"]
+    out = svc.search(query, corpus_scope=corpus_scope, user_folders=user_folders)
     target_article = None
     try:
         from online_core.query_parser import parse_query
@@ -106,7 +114,7 @@ def build_context(query: str) -> tuple[str, dict]:
     context = "\n\n".join(blocks) if blocks else "（检索无结果）"
     return context, out.trace
 
-async def event_gen(query: str, session_id: str):
+async def event_gen(query: str, session_id: str, folders: list[str] | None = None):
     # PreFilter 保守模式（D02 §3.2）
     from .prefilter import prefilter, TRIVIAL_REPLY
     pf = prefilter(query)
@@ -120,7 +128,7 @@ async def event_gen(query: str, session_id: str):
 
     # 1. 检索
     yield f"data: {json.dumps({'type': 'step_start', 'step': 'retrieval'}, ensure_ascii=False)}\n\n"
-    context, trace = build_context(query)
+    context, trace = build_context(query, folders)
     yield f"data: {json.dumps({'type': 'trace', 'trace': trace}, ensure_ascii=False)}\n\n"
 
 
@@ -210,4 +218,7 @@ async def chat(payload: dict):
     if not query:
         return {"ok": False, "error": {"code": "empty_query", "message": "query 不能为空"}}
     session_id = payload.get("session_id") or uuid.uuid4().hex
-    return StreamingResponse(event_gen(query, session_id), media_type="text/event-stream")
+    folders = payload.get("folders") or None
+    if isinstance(folders, str):
+        folders = [folders]
+    return StreamingResponse(event_gen(query, session_id, folders), media_type="text/event-stream")

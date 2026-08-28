@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, File, UploadFile
+from fastapi import APIRouter, File, Form, UploadFile
 
 from .db import get_engine
 import sqlalchemy as sa
@@ -85,8 +85,51 @@ def _parse_file(path: Path) -> StructuredDocument | None:
     return None
 
 
+def _ensure_folder(conn, kb_id: str) -> None:
+    conn.execute(
+        sa.text("INSERT OR IGNORE INTO user_kb (kb_id, name) VALUES (:k, :n)"),
+        {"k": kb_id, "n": kb_id},
+    )
+
+
+@router.post("/folders")
+def create_folder(payload: dict):
+    name = (payload.get("name") or "").strip()
+    if not name:
+        return {"ok": False, "error": {"code": "empty_name", "message": "文件夹名不能为空"}}
+    engine = get_engine()
+    with engine.begin() as conn:
+        conn.execute(sa.text("INSERT OR IGNORE INTO user_kb (kb_id, name) VALUES (:k, :n)"), {"k": name, "n": name})
+    engine.dispose()
+    return {"ok": True, "data": {"kb_id": name, "name": name}}
+
+
+@router.get("/folders")
+def list_folders():
+    engine = get_engine()
+    with engine.begin() as conn:
+        _ensure_folder(conn, DEFAULT_KB_ID)
+        rows = conn.execute(sa.text("SELECT kb_id, name FROM user_kb ORDER BY name")).fetchall()
+    engine.dispose()
+    return {"ok": True, "data": [dict(r._mapping) for r in rows]}
+
+
+@router.delete("/folders/{kb_id}")
+def delete_folder(kb_id: str):
+    if kb_id == DEFAULT_KB_ID:
+        return {"ok": False, "error": {"code": "default_folder", "message": "不能删除默认文件夹"}}
+    engine = get_engine()
+    with engine.begin() as conn:
+        cnt = conn.execute(sa.text("SELECT COUNT(*) FROM user_docs WHERE kb_id=:k"), {"k": kb_id}).scalar()
+        if cnt and cnt > 0:
+            return {"ok": False, "error": {"code": "folder_not_empty", "message": "请先删除文件夹内的文档"}}
+        conn.execute(sa.text("DELETE FROM user_kb WHERE kb_id=:k"), {"k": kb_id})
+    engine.dispose()
+    return {"ok": True}
+
+
 @router.post("/upload")
-async def upload(file: UploadFile = File(...), kb_id: str = DEFAULT_KB_ID):
+async def upload(file: UploadFile = File(...), kb_id: str = Form(DEFAULT_KB_ID)):
     filename = file.filename or "untitled"
     ext = Path(filename).suffix.lower()
     if ext not in SUPPORTED:
@@ -116,6 +159,7 @@ async def upload(file: UploadFile = File(...), kb_id: str = DEFAULT_KB_ID):
         "corpus": "user",
         "user_id": USER_ID,
         "kb_id": kb_id,
+        "folder": kb_id,
         "law_name": filename,
         "doc_type": "user",
     }
@@ -129,6 +173,7 @@ async def upload(file: UploadFile = File(...), kb_id: str = DEFAULT_KB_ID):
     # SQLite 记录
     engine = get_engine()
     with engine.begin() as conn:
+        _ensure_folder(conn, kb_id)
         conn.execute(
             sa.text(
                 "INSERT OR REPLACE INTO user_docs (doc_id, kb_id, file_path, parse_status, chunk_count) "
@@ -142,15 +187,55 @@ async def upload(file: UploadFile = File(...), kb_id: str = DEFAULT_KB_ID):
 
 
 @router.get("/docs")
-def list_docs():
+def list_docs(folder: str | None = None):
     try:
         engine = get_engine()
+        sql = "SELECT doc_id, kb_id, file_path, parse_status, chunk_count, created_at FROM user_docs"
+        params = {}
+        if folder:
+            sql += " WHERE kb_id=:f"
+            params["f"] = folder
+        sql += " ORDER BY created_at DESC"
         with engine.begin() as conn:
-            rows = conn.execute(sa.text("SELECT doc_id, kb_id, file_path, parse_status, chunk_count, created_at FROM user_docs ORDER BY created_at DESC")).fetchall()
+            rows = conn.execute(sa.text(sql), params).fetchall()
         engine.dispose()
         return {"ok": True, "data": [dict(r._mapping) for r in rows]}
     except Exception as e:
         return {"ok": False, "error": {"code": "db_error", "message": str(e)}}
+
+
+@router.get("/docs/{doc_id}/chunks")
+def doc_chunks(doc_id: str):
+    """查看某文档在 Qdrant 中的切分结果（只读）。"""
+    from online_core.retrieval_service import get_retrieval_service
+    try:
+        svc = get_retrieval_service()
+        store = svc._get_store()
+        chunks, _ = store.scroll_paginated(
+            filter_condition={"must": [{"key": "doc_id", "match": {"value": doc_id}}]},
+            limit=100,
+        )
+        data = []
+        for ch in chunks:
+            meta = ch.metadata or {}
+            data.append({
+                "chunk_id": ch.chunk_id,
+                "text": ch.text,
+                "chunk_level": ch.chunk_level,
+                "order": ch.order,
+                "token_count": ch.token_count,
+                "parent_chunk_id": ch.parent_chunk_id,
+                "law_name": meta.get("law_name"),
+                "article_no": meta.get("article_no"),
+                "articles": meta.get("articles"),
+                "folder": meta.get("folder"),
+                "kb_id": meta.get("kb_id"),
+                "doc_type": meta.get("doc_type"),
+                "heading_path": ch.heading_path,
+            })
+        return {"ok": True, "data": data}
+    except Exception as e:
+        return {"ok": False, "error": {"code": "chunk_list_failed", "message": str(e)}}
 
 
 @router.delete("/docs/{doc_id}")

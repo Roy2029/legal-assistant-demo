@@ -6,9 +6,19 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = PROJECT_ROOT / "data"
 DB_PATH = DATA_DIR / "sqlite.db"
 
+_tables_ready = False
+
+
 def get_engine() -> sa.Engine:
+    global _tables_ready
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    return sa.create_engine(f"sqlite:///{DB_PATH}", echo=False)
+    engine = sa.create_engine(f"sqlite:///{DB_PATH}", echo=False)
+    if not _tables_ready:
+        with engine.begin() as conn:
+            for ddl in TABLES.values():
+                conn.execute(sa.text(ddl))
+        _tables_ready = True
+    return engine
 
 TABLES: dict[str, str] = {
     "sessions": """
@@ -80,6 +90,23 @@ TABLES: dict[str, str] = {
             detail TEXT,
             started_at TEXT DEFAULT (datetime('now','localtime')),
             finished_at TEXT
+        )""",
+    "badcase_feedback": """
+        CREATE TABLE IF NOT EXISTS badcase_feedback (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT,
+            trace_id TEXT,
+            mode TEXT NOT NULL DEFAULT 'chat',
+            action TEXT,
+            query TEXT NOT NULL,
+            answer TEXT,
+            reason TEXT NOT NULL DEFAULT 'other',
+            root_cause TEXT,
+            note TEXT,
+            trace_json TEXT,
+            status TEXT NOT NULL DEFAULT 'new',
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            updated_at TEXT DEFAULT (datetime('now','localtime'))
         )""",
     "badcases": """
         CREATE TABLE IF NOT EXISTS badcases (

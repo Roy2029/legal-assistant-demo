@@ -110,8 +110,11 @@ class RetrievalService:
                 self._reranker = None
         return self._reranker
 
-    def search(self, query: str, corpus_scope: str = "all") -> RetrievalOutput:
-        """corpus_scope: all（public+本人 user）/ public / user。"""
+    def search(self, query: str, corpus_scope: str = "all", user_folders: Optional[list[str]] = None) -> RetrievalOutput:
+        """corpus_scope: all（public+本人 user）/ public / user。
+
+        user_folders: 只检索这些用户文件夹（metadata.folder），传入后覆盖 corpus_scope。
+        """
         # 1. query 解析
         pq = parse_query(query)
         # 2. 难度分档
@@ -121,7 +124,11 @@ class RetrievalService:
         # 4. 构造 Qdrant filter（元数据字段位于 payload.metadata 下，用嵌套 key）
         filters = None
         must = []
-        if corpus_scope == "public":
+        if user_folders:
+            must.append({"key": "metadata.corpus", "match": {"value": "user"}})
+            must.append({"key": "metadata.user_id", "match": {"value": "local"}})
+            must.append({"key": "metadata.folder", "match": {"any": list(user_folders)}})
+        elif corpus_scope == "public":
             must.append({"key": "metadata.corpus", "match": {"value": "public"}})
         elif corpus_scope == "user":
             must.append({"key": "metadata.corpus", "match": {"value": "user"}})

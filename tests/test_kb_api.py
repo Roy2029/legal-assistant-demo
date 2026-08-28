@@ -35,7 +35,8 @@ def test_upload_list_retrieve_delete():
     r = client.delete(f"/api/kb/docs/{doc_id}")
     assert r.status_code == 200 and r.json()["ok"]
     out2 = svc.search("连续旷工三日", corpus_scope="user")
-    assert all(r.chunk.metadata.get("corpus") != "user" for r in out2.results) or len(out2.results) == 0
+    # 只验证本次上传文档已删除；用户库中可能有历史文档
+    assert all(r.chunk.doc_id != doc_id for r in out2.results), "删除后仍检索到该文档"
     print("PASS upload_list_retrieve_delete")
 
 if __name__ == "__main__":
