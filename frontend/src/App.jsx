@@ -477,11 +477,96 @@ function KbPage() {
   const [uploadProgress, setUploadProgress] = useState('')
   const [chunkViewDoc, setChunkViewDoc] = useState(null)
   const [chunks, setChunks] = useState([])
+  const [editingChunk, setEditingChunk] = useState(null)
+  const [editText, setEditText] = useState('')
+  const [splittingChunk, setSplittingChunk] = useState(null)
+  const [splitPart1, setSplitPart1] = useState('')
+  const [splitPart2, setSplitPart2] = useState('')
+  const [chunkBusy, setChunkBusy] = useState(false)
 
   async function viewChunks(docId) {
     const r = await fetch('/api/kb/docs/' + encodeURIComponent(docId) + '/chunks')
     const d = await r.json()
     if (d.ok) { setChunks(d.data || []); setChunkViewDoc(docId) } else { message.error(d.error?.message || '获取分块失败') }
+  }
+
+  async function saveChunkEdit() {
+    if (!editingChunk || !editText.trim() || chunkBusy) return
+    setChunkBusy(true)
+    try {
+      const r = await fetch(`/api/kb/docs/${encodeURIComponent(chunkViewDoc)}/chunks/${encodeURIComponent(editingChunk.chunk_id)}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: editText }),
+      })
+      const d = await r.json()
+      if (d.ok) { message.success('已更新分块'); setEditingChunk(null); viewChunks(chunkViewDoc); loadDocs() } else { message.error(d.error?.message || '更新失败') }
+    } catch (e) { message.error('更新失败: ' + e.message) } finally { setChunkBusy(false) }
+  }
+
+  function openSplit(c) {
+    const text = c.text || ''
+    const NL = String.fromCharCode(10)
+    const puncts = ['。', '；', ';', '！', '？']
+    const mid = Math.floor(text.length / 2)
+    let cut = mid
+    for (let i = 0; i < 120; i++) {
+      const pos = mid + i
+      if (pos < text.length && (puncts.includes(text[pos]) || text[pos] === NL)) { cut = pos + 1; break }
+      const neg = mid - i
+      if (neg > 0 && (puncts.includes(text[neg]) || text[neg] === NL)) { cut = neg + 1; break }
+    }
+    setSplitPart1(text.slice(0, cut).trim())
+    setSplitPart2(text.slice(cut).trim())
+    setSplittingChunk(c)
+  }
+
+  async function saveChunkSplit() {
+    if (!splittingChunk || !splitPart1.trim() || !splitPart2.trim() || chunkBusy) return
+    setChunkBusy(true)
+    try {
+      const r = await fetch(`/api/kb/docs/${encodeURIComponent(chunkViewDoc)}/chunks/${encodeURIComponent(splittingChunk.chunk_id)}/split`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ part1: splitPart1, part2: splitPart2 }),
+      })
+      const d = await r.json()
+      if (d.ok) { message.success('已拆分分块'); setSplittingChunk(null); viewChunks(chunkViewDoc); loadDocs() } else { message.error(d.error?.message || '拆分失败') }
+    } catch (e) { message.error('拆分失败: ' + e.message) } finally { setChunkBusy(false) }
+  }
+
+  async function mergeChunkWithPrev(i) {
+    if (i <= 0 || chunkBusy) return
+    const c1 = chunks[i - 1]
+    const c2 = chunks[i]
+    Modal.confirm({
+      title: '合并分块',
+      content: `将 #${i} 与 #${i + 1} 合并为一段？`,
+      okText: '合并', cancelText: '取消',
+      onOk: async () => {
+        setChunkBusy(true)
+        try {
+          const r = await fetch(`/api/kb/docs/${encodeURIComponent(chunkViewDoc)}/chunks/merge`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chunk_id1: c1.chunk_id, chunk_id2: c2.chunk_id }),
+          })
+          const d = await r.json()
+          if (d.ok) { message.success('已合并分块'); viewChunks(chunkViewDoc); loadDocs() } else { message.error(d.error?.message || '合并失败') }
+        } catch (e) { message.error('合并失败: ' + e.message) } finally { setChunkBusy(false) }
+      },
+    })
+  }
+
+  async function deleteChunk(c) {
+    if (chunkBusy) return
+    Modal.confirm({
+      title: '删除分块',
+      content: '删除该分块后不可恢复，确认删除？',
+      okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
+      onOk: async () => {
+        setChunkBusy(true)
+        try {
+          const r = await fetch(`/api/kb/docs/${encodeURIComponent(chunkViewDoc)}/chunks/${encodeURIComponent(c.chunk_id)}`, { method: 'DELETE' })
+          const d = await r.json()
+          if (d.ok) { message.success('已删除分块'); viewChunks(chunkViewDoc); loadDocs() } else { message.error(d.error?.message || '删除失败') }
+        } catch (e) { message.error('删除失败: ' + e.message) } finally { setChunkBusy(false) }
+      },
+    })
   }
 
   function loadDocs() {
@@ -569,7 +654,7 @@ function KbPage() {
             <Text type="secondary">{d.chunk_count} chunks</Text>
           </List.Item>
         )} />
-        <Modal open={!!chunkViewDoc} onCancel={() => setChunkViewDoc(null)} footer={null} title={`分块查看（${chunkViewDoc || ''}）`} width={860}>
+        <Modal open={!!chunkViewDoc} onCancel={() => setChunkViewDoc(null)} footer={null} title={`分块查看与调整（${chunkViewDoc || ''}）`} width={860}>
           <div style={{ maxHeight: 480, overflow: 'auto' }}>
             {chunks.length === 0 && <Text type="secondary">（无分块）</Text>}
             {chunks.map((c, i) => (
@@ -581,11 +666,30 @@ function KbPage() {
                   {c.folder && <Tag color="orange">{c.folder}</Tag>}
                   <Text type="secondary" style={{ fontSize: 11 }}>{c.token_count} tokens</Text>
                 </Space>
+              } extra={
+                <Space size={4}>
+                  <Button size="small" type="link" onClick={() => { setEditingChunk(c); setEditText(c.text || '') }}>编辑</Button>
+                  <Button size="small" type="link" onClick={() => openSplit(c)}>拆分</Button>
+                  {i > 0 && <Button size="small" type="link" onClick={() => mergeChunkWithPrev(i)}>与上一块合并</Button>}
+                  {chunks.length > 1 && <Button size="small" type="link" danger onClick={() => deleteChunk(c)}>删除</Button>}
+                </Space>
               }>
                 <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, margin: 0, maxHeight: 160, overflow: 'auto' }}>{c.text}</pre>
               </Card>
             ))}
           </div>
+        </Modal>
+        <Modal open={!!editingChunk} onCancel={() => setEditingChunk(null)} onOk={saveChunkEdit} okText="保存" cancelText="取消" confirmLoading={chunkBusy} width={720} title="编辑分块文本">
+          <Input.TextArea value={editText} onChange={(e) => setEditText(e.target.value)} autoSize={{ minRows: 8, maxRows: 24 }} />
+          <Text type="secondary" style={{ fontSize: 12 }}>保存后该分块将按新文本重新嵌入。</Text>
+        </Modal>
+        <Modal open={!!splittingChunk} onCancel={() => setSplittingChunk(null)} onOk={saveChunkSplit} okText="拆分" cancelText="取消" confirmLoading={chunkBusy} width={720} title="拆分为两个分块">
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <Text strong>第 1 段：</Text>
+            <Input.TextArea value={splitPart1} onChange={(e) => setSplitPart1(e.target.value)} autoSize={{ minRows: 4, maxRows: 12 }} />
+            <Text strong>第 2 段：</Text>
+            <Input.TextArea value={splitPart2} onChange={(e) => setSplitPart2(e.target.value)} autoSize={{ minRows: 4, maxRows: 12 }} />
+          </Space>
         </Modal>
       </Space>
     </Card>

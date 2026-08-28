@@ -69,6 +69,64 @@ def _run():
     print("PASS folder_upload_filter_chunks")
 
 
+def test_chunk_manage():
+    TEST_MD.write_text(
+        """# 测试公司考勤管理办法
+
+第一条 为规范公司考勤管理，制定本办法。
+第二条 连续旷工三日的，公司可以解除劳动合同。
+第三条 加班的，应当支付加班费。
+""",
+        encoding="utf-8",
+    )
+    try:
+        r = client.post("/api/kb/folders", json={"name": "test-folder"})
+        assert r.json()["ok"]
+        with open(TEST_MD, "rb") as f:
+            r = client.post("/api/kb/upload", files={"file": ("test_upload_folder.md", f, "text/markdown")}, data={"kb_id": "test-folder"})
+        assert r.status_code == 200 and r.json()["ok"], r.text
+        doc_id = r.json()["data"]["doc_id"]
+
+        # 取 chunk 列表
+        r = client.get(f"/api/kb/docs/{doc_id}/chunks")
+        assert r.json()["ok"]
+        chunks = r.json()["data"]
+        assert len(chunks) >= 1
+
+        # 编辑第一个 chunk
+        c0 = chunks[0]
+        r = client.put(f"/api/kb/docs/{doc_id}/chunks/{c0['chunk_id']}", json={"text": "第一条 为规范公司考勤管理，制定本办法。\n第二条 连续旷工三日的，公司可以解除劳动合同。"})
+        assert r.status_code == 200 and r.json()["ok"], r.text
+        new_id = r.json()["data"]["chunk_id"]
+
+        # 拆分成两个
+        r = client.post(f"/api/kb/docs/{doc_id}/chunks/{new_id}/split", json={"part1": "第一条 为规范公司考勤管理，制定本办法。", "part2": "第二条 连续旷工三日的，公司可以解除劳动合同。"})
+        assert r.status_code == 200 and r.json()["ok"], r.text
+        ids = r.json()["data"]["chunks"]
+        assert len(ids) == 2
+
+        # 合并
+        r = client.post(f"/api/kb/docs/{doc_id}/chunks/merge", json={"chunk_id1": ids[0], "chunk_id2": ids[1]})
+        assert r.status_code == 200 and r.json()["ok"], r.text
+
+        # 只有一个 chunk 时删除应被拒绝
+        r = client.get(f"/api/kb/docs/{doc_id}/chunks")
+        chunks = r.json()["data"]
+        assert len(chunks) == 1
+        r = client.delete(f"/api/kb/docs/{doc_id}/chunks/{chunks[0]['chunk_id']}")
+        assert r.status_code == 200 and not r.json()["ok"]
+
+        # 清理
+        r = client.delete(f"/api/kb/docs/{doc_id}")
+        assert r.json()["ok"]
+        r = client.delete("/api/kb/folders/test-folder")
+        assert r.json()["ok"]
+        print("PASS chunk_manage")
+    finally:
+        TEST_MD.unlink(missing_ok=True)
+
+
 if __name__ == "__main__":
     test_folder_upload_filter_chunks()
+    test_chunk_manage()
     print("ALL KB FOLDER TESTS PASSED")

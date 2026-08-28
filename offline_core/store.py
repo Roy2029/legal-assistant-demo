@@ -759,19 +759,15 @@ class QdrantStore(BaseStore[SearchQuery, EmbeddingRecord]):
 
     def delete_by_doc_id(self, doc_id: str) -> None:
         """按文档 ID 删除所有关联 chunk（增量更新预留）。"""
+        self.delete_by_filter({"must": [{"key": "doc_id", "match": {"value": doc_id}}]})
+
+    def delete_by_filter(self, filter_condition: dict) -> None:
+        """按 Qdrant Filter dict 删除点（如 doc_id + chunk_id）。"""
         _ensure_qdrant()
+        qdrant_filter = _models.Filter(**filter_condition)
         self.client.delete(
             collection_name=self.collection_name,
-            points_selector=_models.FilterSelector(
-                filter=_models.Filter(
-                    must=[
-                        _models.FieldCondition(
-                            key="doc_id",
-                            match=_models.MatchValue(value=doc_id),
-                        )
-                    ]
-                )
-            ),
+            points_selector=_models.FilterSelector(filter=qdrant_filter),
         )
 
     def count(self, filters: Optional[dict] = None) -> int:
