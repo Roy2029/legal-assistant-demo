@@ -113,8 +113,27 @@ async def assistant_event_gen(action: str, query: str):
             yield f"data: {json.dumps({'type': 'tool_result', 'tool': tool, 'summary': '命中 ' + str(result['total']) + ' 条'}, ensure_ascii=False)}\n\n"
 
         elif tool == "search_law":
+            import asyncio
+            from online_core.agents.rag_agent import RAGAgent
             yield f"data: {json.dumps({'type': 'agent_start', 'agent': 'knowledge', 'task': query}, ensure_ascii=False)}\n\n"
-            result = await tool_search_law(query, session_id=trace_id)
+            agent = RAGAgent(session_id=trace_id)
+            q = asyncio.Queue()
+
+            async def cb(evt):
+                await q.put(evt)
+
+            task = asyncio.create_task(agent.run(query, event_cb=cb))
+            while not task.done() or not q.empty():
+                try:
+                    evt = await asyncio.wait_for(q.get(), timeout=0.2)
+                    yield f"data: {json.dumps(evt, ensure_ascii=False)}\n\n"
+                except asyncio.TimeoutError:
+                    continue
+            try:
+                result = task.result()
+            except Exception as e:
+                yield f"data: {json.dumps({'type': 'error', 'code': 'search_law_failed', 'message': str(e)}, ensure_ascii=False)}\n\n"
+                continue
             tool_results["search_law"] = result
             yield f"data: {json.dumps({'type': 'agent_trace', 'agent': 'knowledge', 'trace': result.get('trace', {})}, ensure_ascii=False)}\n\n"
             yield f"data: {json.dumps({'type': 'agent_report', 'agent': 'knowledge', 'answer': result.get('answer', ''), 'report': result.get('report', ''), 'citations': result.get('citations', []), 'needs_human': result.get('needs_human', False)}, ensure_ascii=False)}\n\n"

@@ -32,6 +32,22 @@ def list_sessions():
     return {"ok": True, "data": [dict(r._mapping) for r in rows]}
 
 
+@router.put("/{session_id}")
+def rename_session(session_id: str, payload: dict):
+    title = (payload or {}).get("title") or ""
+    title = title.strip()
+    if not title:
+        return {"ok": False, "error": {"code": "empty_title", "message": "标题不能为空"}}
+    engine = get_engine()
+    with engine.begin() as conn:
+        cur = conn.execute(sa.text("UPDATE sessions SET title=:t WHERE session_id=:s"), {"t": title, "s": session_id})
+        ok = cur.rowcount > 0
+    engine.dispose()
+    if not ok:
+        return {"ok": False, "error": {"code": "not_found", "message": "会话不存在"}}
+    return {"ok": True, "data": {"session_id": session_id, "title": title}}
+
+
 @router.delete("/{session_id}")
 def delete_session(session_id: str):
     engine = get_engine()

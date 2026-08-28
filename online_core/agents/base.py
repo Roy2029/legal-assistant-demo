@@ -95,7 +95,14 @@ class BaseReActAgent:
         return keep_head + [{"role": "system", "content": summary}] + keep_recent
 
     # ── 主循环 ──────────────────────────────────────────────────
-    async def run(self, query: str, **kwargs) -> dict:
+    async def run(self, query: str, event_cb=None, **kwargs) -> dict:
+        async def emit(evt):
+            if event_cb is not None:
+                try:
+                    await event_cb(evt)
+                except Exception:
+                    pass
+
         messages = [
             {"role": "system", "content": self.build_system(query, **kwargs)},
             {"role": "user", "content": query},
@@ -108,6 +115,7 @@ class BaseReActAgent:
         for iteration in range(1, self.max_iterations + 1):
             if time.time() - start > self.loop_timeout:
                 self.trace["errors"].append({"type": "loop_timeout", "iteration": iteration})
+                await emit({"type": "agent_retry", "reason": "loop_timeout", "iteration": iteration})
                 final = {"report": last_content or "检索超时", "answer": last_content or "检索未完成", "needs_human": True, "citations": []}
                 break
 
@@ -118,6 +126,7 @@ class BaseReActAgent:
                 resp = await self.llm.chat_with_tools(messages, self.tools())
             except Exception as e:
                 self.trace["errors"].append({"type": "llm_error", "iteration": iteration, "error": str(e)})
+                await emit({"type": "agent_error", "code": "llm_error", "message": str(e)})
                 final = {"report": f"LLM 调用失败：{e}", "answer": "", "needs_human": True, "citations": []}
                 break
 
@@ -126,6 +135,7 @@ class BaseReActAgent:
             round_trace["think_present"] = bool(content)
             if content:
                 last_content = content
+                await emit({"type": "agent_think", "text": content})
 
             if not tool_calls:
                 final = {"report": content or "（模型未给出结束说明）", "answer": content, "needs_human": False, "citations": []}
@@ -171,6 +181,8 @@ class BaseReActAgent:
             for tc, result, elapsed in results:
                 ok = result.get("ok", False) if isinstance(result, dict) else False
                 round_trace["tool_calls"].append({"tool": tc["name"], "ok": ok, "elapsed_ms": elapsed, "summary": str(result)[:200]})
+                await emit({"type": "agent_tool_call", "tool": tc["name"], "params": tc.get("arguments") or {}})
+                await emit({"type": "agent_tool_result", "tool": tc["name"], "ok": ok, "summary": str(result)[:300]})
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc["id"] or f"call_{iteration}_{len(messages)}",
@@ -187,6 +199,7 @@ class BaseReActAgent:
                 break
             if consecutive_failures >= 3:
                 messages.append({"role": "system", "content": "[system-reminder] 已连续失败 3 次，请重新评估策略后再继续。"})
+                await emit({"type": "agent_retry", "reason": "consecutive_failures", "iteration": iteration})
                 consecutive_failures = 0
 
             round_trace["elapsed_ms"] = _now_ms() - t0

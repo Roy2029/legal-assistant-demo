@@ -61,6 +61,11 @@ function Feedback({ mode, action, sessionId, traceId, query, answer, trace }) {
   )
 }
 
+function displayFileName(filePath) {
+  const name = (filePath || '').split(/[\\/]/).pop() || ''
+  return name.replace(/^[0-9a-f]{32}__/, '')
+}
+
 function ChunkList({ items, onOpenFull }) {
   if (!items || items.length === 0) return <Text type="secondary" style={{ fontSize: 12 }}>（无结果）</Text>
   return (
@@ -123,6 +128,14 @@ function ChatPage() {
     setMessages([])
     loadSessions()
   }
+
+  async function renameSession() {
+    const title = renameText.trim()
+    if (!title) return
+    const r = await fetch('/api/sessions/' + sessionId, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) })
+    const d = await r.json()
+    if (d.ok) { message.success('已重命名'); setRenameOpen(false); loadSessions() } else { message.error(d.error?.message || '重命名失败') }
+  }
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
   const [trace, setTrace] = useState(null)
@@ -134,6 +147,8 @@ function ChatPage() {
   const [traceId, setTraceId] = useState(null)
   const [folderOptions, setFolderOptions] = useState([])
   const [folderFilter, setFolderFilter] = useState([])
+  const [renameOpen, setRenameOpen] = useState(false)
+  const [renameText, setRenameText] = useState('')
 
   async function openFullChunk(c) {
     try {
@@ -271,12 +286,16 @@ function ChatPage() {
         <Modal open={!!fullChunk} onCancel={() => setFullChunk(null)} footer={null} title={fullChunk ? `${fullChunk.law_name || ''} ${fullChunk.article_no ? '第' + fullChunk.article_no + '条' : ''} ${fullChunk.chunk_id || ''}`.trim() : ''} width={720}>
           <pre style={{ whiteSpace: 'pre-wrap', maxHeight: 480, overflow: 'auto', fontSize: 13 }}>{fullChunk?.text}</pre>
         </Modal>
+        <Modal open={renameOpen} onCancel={() => setRenameOpen(false)} onOk={renameSession} okText="保存" cancelText="取消" title="会话重命名">
+          <Input value={renameText} onChange={(e) => setRenameText(e.target.value)} placeholder="会话标题" />
+        </Modal>
         <Modal open={!!chunkModal} onCancel={() => setChunkModal(null)} footer={null} title={chunkModal ? `${chunkModal.law_name} 第${chunkModal.article_no}条` : ''}>
           <pre style={{ whiteSpace: 'pre-wrap', maxHeight: 400, overflow: 'auto', fontSize: 13 }}>{chunkModal?.text}</pre>
         </Modal>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
           <Select size='small' style={{ width: 220 }} value={sessionId} onChange={(v) => { setSessionId(v); loadMessages(v) }} options={sessions.map((s) => ({ value: s.session_id, label: s.title || s.session_id.slice(0, 8) }))} />
           <Button size='small' onClick={newSession}>新建会话</Button>
+          <Button size='small' onClick={() => { setRenameText(sessions.find((s) => s.session_id === sessionId)?.title || ''); setRenameOpen(true) }}>重命名</Button>
           <Button size='small' danger onClick={deleteSession}>删除</Button>
           <Select size='small' mode="multiple" allowClear style={{ minWidth: 260, flex: 1 }} placeholder="全部知识库（公共+本人）" value={folderFilter} onChange={setFolderFilter}
             options={[{ value: '__public__', label: '公共法律库' }, ...folderOptions]} />
@@ -447,6 +466,10 @@ function AssistantPage() {
           else if (evt.type === 'tool_call') setSteps((s) => [...s, { tool: evt.tool, params: evt.params, status: 'tool' }])
           else if (evt.type === 'tool_result') setSteps((s) => [...s, { summary: evt.summary, status: 'done' }])
           else if (evt.type === 'agent_start') setSteps((s) => [...s, { step: (evt.agent === 'knowledge' ? '知识库检索 agent' : '类案检索 agent') + ' 启动', status: 'running' }])
+          else if (evt.type === 'agent_think') setSteps((s) => [...s, { step: '推理', summary: (evt.text || '').slice(0, 120), status: 'done' }])
+          else if (evt.type === 'agent_tool_call') setSteps((s) => [...s, { tool: evt.tool, params: evt.params, status: 'tool' }])
+          else if (evt.type === 'agent_tool_result') setSteps((s) => [...s, { summary: (evt.summary || '').slice(0, 160), status: 'done' }])
+          else if (evt.type === 'agent_retry') setSteps((s) => [...s, { step: '重试', summary: evt.reason, status: 'running' }])
           else if (evt.type === 'agent_report') setSteps((s) => [...s, { step: '检索报告', summary: evt.answer || (evt.needs_human ? '需人工介入' : '已生成'), status: 'done' }])
           else if (evt.type === 'step_end') setSteps((s) => [...s, { step: evt.step + ' 完成', summary: evt.summary, status: 'done' }])
           else if (evt.type === 'final') { setFinalText(evt.answer || ''); if (evt.report) setFinalReport(evt.report) }
@@ -502,6 +525,8 @@ function KbPage() {
   const [newFolder, setNewFolder] = useState('')
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState('')
+  const [rebuilding, setRebuilding] = useState(false)
+  const [rebuildMsg, setRebuildMsg] = useState('')
   const [chunkViewDoc, setChunkViewDoc] = useState(null)
   const [chunks, setChunks] = useState([])
   const [editingChunk, setEditingChunk] = useState(null)
@@ -622,6 +647,28 @@ function KbPage() {
     if (d.ok) { message.success(`已创建文件夹：${name}`); setNewFolder(''); setFolder(name); loadFolders() } else { message.error(d.error?.message || '创建失败') }
   }
 
+  async function rebuildKb() {
+    Modal.confirm({
+      title: '重建法律库索引',
+      content: '将释放检索服务并后台重建索引，期间知识库问答可能暂时不可用。确认继续？',
+      okText: '重建', cancelText: '取消',
+      onOk: async () => {
+        setRebuilding(true); setRebuildMsg('重建启动中...')
+        const r = await fetch('/api/kb/rebuild', { method: 'POST' })
+        const d = await r.json()
+        if (!d.ok) { message.error(d.error?.message || '启动失败'); setRebuilding(false); return }
+        const timer = setInterval(async () => {
+          try {
+            const s = await fetch('/api/kb/rebuild/status').then((x) => x.json())
+            const st = s.data || {}
+            if (st.running) { setRebuildMsg(`重建中...（已启动 ${st.started_at || ''}）`) }
+            else { clearInterval(timer); setRebuilding(false); setRebuildMsg(st.ok ? '重建完成' : `重建失败：${st.error || '未知错误'}`); message.info('法律库索引已更新'); loadFolders(); loadDocs() }
+          } catch (e) { clearInterval(timer); setRebuilding(false); setRebuildMsg('状态查询失败') }
+        }, 5000)
+      },
+    })
+  }
+
   async function saveRenameFolder() {
     const name = (renameText || '').trim()
     if (!renamingFolder || !name) return
@@ -705,6 +752,8 @@ function KbPage() {
           <Text strong>新建文件夹：</Text>
           <Input size="small" style={{ width: 160 }} placeholder="新文件夹名" value={newFolder} onChange={(e) => setNewFolder(e.target.value)} onPressEnter={createFolder} />
           <Button size="small" onClick={createFolder}>新建</Button>
+          <Button size="small" danger onClick={rebuildKb} loading={rebuilding}>重建法律库</Button>
+          {rebuildMsg && <Text type="secondary">{rebuildMsg}</Text>}
         </Space>
         <Space wrap>
           <Text strong>批量移动：</Text>
@@ -739,7 +788,7 @@ function KbPage() {
             <Button key="del" size="small" danger onClick={() => remove(d.doc_id)}>删除</Button>,
           ]}>
             <Checkbox checked={selectedIds.includes(d.doc_id)} onChange={(e) => setSelectedIds((prev) => e.target.checked ? [...prev, d.doc_id] : prev.filter((x) => x !== d.doc_id))} />
-            <Text>{d.file_path?.replace(/.*[\/]/, '').replace(/^[0-9a-f]{32}__/, '')}</Text>
+            <Text>{displayFileName(d.file_path)}</Text>
             <Tag color="blue">{d.kb_id || 'default'}</Tag>
             <Tag>{d.parse_status}</Tag>
             <Text type="secondary">{d.chunk_count} chunks</Text>

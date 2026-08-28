@@ -16,12 +16,25 @@ def _sse(payload: dict) -> str:
 
 
 async def _run_rag_agent(query: str, session_id: str, folders: Optional[list[str]]):
+    import asyncio
     from online_core.agents.rag_agent import RAGAgent
     agent = RAGAgent(session_id=session_id)
+    q: asyncio.Queue = asyncio.Queue()
+
+    async def cb(evt):
+        await q.put(evt)
+
     yield _sse({"type": "session_start", "session_id": session_id, "trace_id": uuid.uuid4().hex})
     yield _sse({"type": "agent_start", "agent": "knowledge", "task": query})
+    task = asyncio.create_task(agent.run(query, folders=folders, event_cb=cb))
+    while not task.done() or not q.empty():
+        try:
+            evt = await asyncio.wait_for(q.get(), timeout=0.2)
+            yield _sse(evt)
+        except asyncio.TimeoutError:
+            continue
     try:
-        result = await agent.run(query, folders=folders)
+        result = task.result()
     except Exception as e:
         yield _sse({"type": "error", "code": "rag_agent_failed", "message": str(e)})
         yield _sse({"type": "done"})
@@ -40,12 +53,25 @@ async def _run_rag_agent(query: str, session_id: str, folders: Optional[list[str
 
 
 async def _run_case_agent(query: str, session_id: str):
+    import asyncio
     from online_core.agents.case_agent import CaseAgent
     agent = CaseAgent(session_id=session_id)
+    q: asyncio.Queue = asyncio.Queue()
+
+    async def cb(evt):
+        await q.put(evt)
+
     yield _sse({"type": "session_start", "session_id": session_id, "trace_id": uuid.uuid4().hex})
     yield _sse({"type": "agent_start", "agent": "case", "task": query})
+    task = asyncio.create_task(agent.run(query, event_cb=cb))
+    while not task.done() or not q.empty():
+        try:
+            evt = await asyncio.wait_for(q.get(), timeout=0.2)
+            yield _sse(evt)
+        except asyncio.TimeoutError:
+            continue
     try:
-        result = await agent.run(query)
+        result = task.result()
     except Exception as e:
         yield _sse({"type": "error", "code": "case_agent_failed", "message": str(e)})
         yield _sse({"type": "done"})
