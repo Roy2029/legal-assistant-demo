@@ -194,6 +194,41 @@ def _run_rule_review(cid: str) -> dict:
     return {"ok": True, "risk_count": len(risks), "high": high, "medium": medium, "low": low, "report": report, "risks": risks}
 
 
+@router.get("/{contract_id}/files")
+def list_contract_files(contract_id: str):
+    files = [p.name for p in _list_redacted_files(contract_id)]
+    return {"ok": True, "data": files}
+
+
+@router.get("/{contract_id}/content")
+def get_contract_content(contract_id: str, file: str):
+    files = _list_redacted_files(contract_id)
+    target = None
+    for p in files:
+        if p.name == file:
+            target = p
+            break
+    if target is None:
+        return JSONResponse({"ok": False, "error": {"code": "not_found", "message": "文件不存在"}}, status_code=404)
+    return {"ok": True, "data": {"file": file, "content": _extract_text(target)}}
+
+
+@router.put("/{contract_id}/content")
+async def update_contract_content(contract_id: str, payload: dict):
+    """把编辑后的文本保存为工作区内的 Markdown 文件，供后续审查使用。"""
+    file = (payload.get("file") or "").strip()
+    content = payload.get("content") or ""
+    if not file:
+        return JSONResponse({"ok": False, "error": {"code": "empty_file", "message": "file 不能为空"}}, status_code=400)
+    files = _list_redacted_files(contract_id)
+    if not any(p.name == file for p in files):
+        return JSONResponse({"ok": False, "error": {"code": "not_found", "message": "文件不存在"}}, status_code=404)
+    stem = Path(file).stem
+    out = _redacted_dir(contract_id) / f"{stem}_编辑版.md"
+    out.write_text(content, encoding="utf-8")
+    return {"ok": True, "data": {"file": out.name}}
+
+
 @router.post("/{contract_id}/review")
 def review_contract(contract_id: str):
     engine = get_engine()

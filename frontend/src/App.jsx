@@ -671,6 +671,35 @@ function KbPage() {
     if (d.ok) { message.success(`已上传：${d.data.name}（${d.data.children} chunks）到 ${folder || 'default'}`) } else { message.error(`${file.name}: ` + (d.error?.message || '上传失败')) }
   }
 
+  async function openEditor(c) {
+    setEditingContract(c); setEditContent(''); setEditFile(undefined); setEditFiles([])
+    try {
+      const r = await fetch(`/api/contracts/${c.contract_id}/files`)
+      const d = await r.json()
+      if (d.ok) { setEditFiles(d.data || []); if (d.data?.length) setEditFile(d.data[0]) }
+    } catch (e) { message.error('获取文件列表失败: ' + e.message) }
+  }
+
+  async function loadEditContent(file) {
+    if (!editingContract || !file) return
+    const r = await fetch(`/api/contracts/${editingContract.contract_id}/content?file=` + encodeURIComponent(file))
+    const d = await r.json()
+    if (d.ok) { setEditContent(d.data.content) } else { message.error(d.error?.message || '读取失败') }
+  }
+
+  async function saveEdit() {
+    if (!editingContract || !editFile || editSaving) return
+    setEditSaving(true)
+    try {
+      const r = await fetch(`/api/contracts/${editingContract.contract_id}/content`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file: editFile, content: editContent }),
+      })
+      const d = await r.json()
+      if (d.ok) { message.success(`已保存编辑版：${d.data.file}`); setEditingContract(null); loadContracts() } else { message.error(d.error?.message || '保存失败') }
+    } catch (e) { message.error('保存失败: ' + e.message) } finally { setEditSaving(false) }
+  }
+
   async function uploadFiles(fileList) {
     const files = Array.from(fileList || [])
     if (!files.length || uploading) return
@@ -794,6 +823,11 @@ function ContractPage() {
   const [contracts, setContracts] = useState([])
   const [uploading, setUploading] = useState(false)
   const [uploadMsg, setUploadMsg] = useState('')
+  const [editingContract, setEditingContract] = useState(null)
+  const [editFiles, setEditFiles] = useState([])
+  const [editFile, setEditFile] = useState(undefined)
+  const [editContent, setEditContent] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
 
   function loadContracts() {
     fetch('/api/contracts').then((r) => r.json()).then((d) => setContracts(d.data || []))
@@ -856,6 +890,7 @@ function ContractPage() {
         <List size="small" dataSource={contracts} renderItem={(c) => (
           <List.Item actions={[
             <Button key="rv" size="small" type="primary" onClick={() => review(c.contract_id)}>审查</Button>,
+            <Button key="ed" size="small" onClick={() => openEditor(c)}>编辑</Button>,
             <Button key="rp" size="small" href={`/api/contracts/${c.contract_id}/report`} target="_blank" disabled={!c.report_path}>报告</Button>,
             <Button key="dl" size="small" href={`/api/contracts/${c.contract_id}/download?kind=redacted`} target="_blank">脱敏版</Button>,
             <Button key="an" size="small" href={`/api/contracts/${c.contract_id}/download?kind=annotated`} target="_blank">批注版</Button>,
@@ -867,6 +902,16 @@ function ContractPage() {
             <Text type="secondary">{c.risk_count} 处风险</Text>
           </List.Item>
         )} />
+        <Modal open={!!editingContract} onCancel={() => setEditingContract(null)} onOk={saveEdit} okText="保存编辑版" cancelText="取消" confirmLoading={editSaving} width={820} title={`编辑合同（${editingContract?.original_name || ''}）`}>
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <Space>
+              <Text strong>选择文件：</Text>
+              <Select size="small" style={{ width: 280 }} value={editFile} onChange={(v) => { setEditFile(v); loadEditContent(v) }} options={editFiles.map((f) => ({ value: f, label: f }))} />
+            </Space>
+            <Input.TextArea value={editContent} onChange={(e) => setEditContent(e.target.value)} autoSize={{ minRows: 12, maxRows: 30 }} />
+            <Text type="secondary" style={{ fontSize: 12 }}>保存后生成「编辑版.md」，再次审查时会一并扫描。</Text>
+          </Space>
+        </Modal>
       </Space>
     </Card>
   )

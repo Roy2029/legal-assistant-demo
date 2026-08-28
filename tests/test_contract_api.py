@@ -38,6 +38,17 @@ def test_contract_flow(tmp_path):
     assert r.json()["ok"]
     assert any(c["contract_id"] == cid for c in r.json()["data"])
 
+    # 在线编辑
+    r = client.get(f"/api/contracts/{cid}/files")
+    assert r.json()["ok"] and len(r.json()["data"]) >= 1
+    files = r.json()["data"]
+    r = client.get(f"/api/contracts/{cid}/content", params={"file": files[0]})
+    assert r.status_code == 200 and r.json()["ok"], r.text
+    r = client.put(f"/api/contracts/{cid}/content", json={"file": files[0], "content": "编辑后的合同内容。逾期按日千分之一支付违约金。"})
+    assert r.status_code == 200 and r.json()["ok"], r.text
+    r = client.get(f"/api/contracts/{cid}/files")
+    assert any(f.endswith("_编辑版.md") for f in r.json()["data"])
+
     # 审查
     r = client.post(f"/api/contracts/{cid}/review")
     assert r.status_code == 200 and r.json()["ok"], r.text
