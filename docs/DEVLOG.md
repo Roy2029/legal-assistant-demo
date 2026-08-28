@@ -95,3 +95,10 @@
   - 分难度：hard/medium 表现接近，simple 组 recall 偏低（qrels 多标签分母大）
 - 全量测试：39 passed
 - 经验：① FastAPI 路由 `/locate` 必须注册在 `/{chunk_id}` 之前，否则被动态路由吞掉；② CitationChecker 与 chunk_api 一样不能自己 new QdrantClient；③ LLM 会从历史里学免责声明，后端追加前先 strip 一次
+
+## 合同审查 agent v1（2026-08-28，AFK 自动开发）
+- 选型：vendored LegalMask（MIT）作为可逆脱敏引擎；PrivacyGuard(lizilaywer) 与 before-signing 作为后续 OCR/工作台参考
+- 完成：合同上传（多文件 docx/pdf）→ 原件存 raw（agent 不可访问）→ LegalMask 脱敏 → 脱敏版入 agent 工作区 → mapping 存不可访问目录 → 规则审查（内置 6 条 + 用户 rules.jsonl 上传）→ 报告/脱敏版/还原版下载 → 删除
+- 前端新增「合同审查」tab
+- 测试：65 passed
+- 待办：LLM 审查工作流、完整 SKILL.md 用户 skill、修订版合同、在线编辑、扫描 PDF OCR
