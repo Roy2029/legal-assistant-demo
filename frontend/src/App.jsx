@@ -739,7 +739,7 @@ function KbPage() {
             <Button key="del" size="small" danger onClick={() => remove(d.doc_id)}>删除</Button>,
           ]}>
             <Checkbox checked={selectedIds.includes(d.doc_id)} onChange={(e) => setSelectedIds((prev) => e.target.checked ? [...prev, d.doc_id] : prev.filter((x) => x !== d.doc_id))} />
-            <Text>{d.file_path?.replace(/.*[\/]/, '')}</Text>
+            <Text>{d.file_path?.replace(/.*[\/]/, '').replace(/^[0-9a-f]{32}__/, '')}</Text>
             <Tag color="blue">{d.kb_id || 'default'}</Tag>
             <Tag>{d.parse_status}</Tag>
             <Text type="secondary">{d.chunk_count} chunks</Text>

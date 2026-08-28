@@ -31,27 +31,36 @@ class WenshuMCPAdapter:
     def available(self) -> bool:
         return self.config.project.exists() and self.config.python.exists()
 
-    async def list_tools(self) -> list[dict]:
+    async def list_tools(self, timeout: float | None = None) -> list[dict]:
         """返回 MCP server 的工具列表。"""
         if not self.available():
             return []
-        async with self._session() as session:
-            tools = await session.list_tools()
-            return [{"name": t.name, "description": t.description or ""} for t in tools.tools]
+        timeout = timeout or self.config.connect_timeout
+        try:
+            async with asyncio.timeout(timeout):
+                async with self._session() as session:
+                    tools = await session.list_tools()
+                    return [{"name": t.name, "description": t.description or ""} for t in tools.tools]
+        except Exception:
+            return []
 
-    async def call_tool(self, name: str, arguments: dict[str, Any]) -> dict:
-        """调用单个工具，返回结构化结果。失败不抛异常。"""
+    async def call_tool(self, name: str, arguments: dict[str, Any], timeout: float | None = None) -> dict:
+        """调用单个工具，返回结构化结果。失败不抛异常，默认 call_timeout 秒超时。"""
         if not self.available():
             return {"ok": False, "error": "MCP 项目不可用", "tool": name}
+        timeout = timeout or self.config.call_timeout
         try:
-            async with self._session() as session:
-                result = await session.call_tool(name, arguments or {})
-                text_parts = []
-                for item in result.content:
-                    text = getattr(item, "text", None)
-                    if text:
-                        text_parts.append(text)
-                return {"ok": True, "tool": name, "result": "\n".join(text_parts)}
+            async with asyncio.timeout(timeout):
+                async with self._session() as session:
+                    result = await session.call_tool(name, arguments or {})
+                    text_parts = []
+                    for item in result.content:
+                        text = getattr(item, "text", None)
+                        if text:
+                            text_parts.append(text)
+                    return {"ok": True, "tool": name, "result": "\n".join(text_parts)}
+        except asyncio.TimeoutError:
+            return {"ok": False, "error": f"MCP 调用超时（>{timeout}s）", "tool": name}
         except Exception as e:
             return {"ok": False, "error": str(e), "tool": name}
 

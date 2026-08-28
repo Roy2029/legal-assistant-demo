@@ -212,7 +212,9 @@ async def upload(file: UploadFile = File(...), kb_id: str = Form(DEFAULT_KB_ID))
         return {"ok": False, "error": {"code": "unsupported_type", "message": f"不支持 {ext}，仅支持 docx/md/txt/pdf"}}
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     doc_id = uuid.uuid4().hex
-    save_path = UPLOAD_DIR / f"{doc_id}{ext}"
+    # 磁盘文件名 = 文档ID + 原文件名，既避免重名覆盖，又保留可读性
+    safe_name = Path(filename).name
+    save_path = UPLOAD_DIR / f"{doc_id}__{safe_name}"
     content = await file.read()
     save_path.write_bytes(content)
 
