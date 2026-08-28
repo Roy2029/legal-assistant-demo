@@ -12,6 +12,36 @@ class LLMNotConfiguredError(RuntimeError):
     pass
 
 
+def parse_tool_calls(payload: dict) -> dict:
+    """从 OpenAI 兼容 /chat/completions 响应中解析 content 与 tool_calls。"""
+    try:
+        msg = payload["choices"][0].get("message", {})
+    except Exception:
+        return {"content": "", "tool_calls": []}
+    content = msg.get("content") or ""
+    tool_calls = []
+    for tc in msg.get("tool_calls") or []:
+        fn = tc.get("function") or {}
+        name = fn.get("name")
+        if not name:
+            continue
+        arguments = fn.get("arguments") or "{}"
+        if isinstance(arguments, dict):
+            args = arguments
+        else:
+            import json
+            try:
+                args = json.loads(arguments)
+            except Exception:
+                args = {}
+        tool_calls.append({
+            "id": tc.get("id") or "",
+            "name": name,
+            "arguments": args,
+        })
+    return {"content": content, "tool_calls": tool_calls}
+
+
 class LLMClient:
     def __init__(self):
         pass
@@ -56,6 +86,26 @@ class LLMClient:
                             yield piece
                     except Exception:
                         continue
+
+    async def chat_with_tools(self, messages: list[dict], tools: list[dict]) -> dict:
+        """OpenAI 兼容 function calling。返回 {content, tool_calls:[{id,name,arguments}]}。"""
+        c = self._cfg()
+        if not self.configured:
+            raise LLMNotConfiguredError("LLM 未配置，请在设置页填写 Base URL / API Key / Model")
+        url = c["base_url"].rstrip("/") + "/chat/completions"
+        headers = {"Authorization": f"Bearer {c['api_key']}"}
+        payload = {
+            "model": c["model"],
+            "messages": messages,
+            "tools": tools,
+            "tool_choice": "auto",
+            "temperature": 0.2,
+            "stream": False,
+        }
+        async with httpx.AsyncClient(timeout=120) as client:
+            resp = await client.post(url, json=payload, headers=headers)
+            resp.raise_for_status()
+            return parse_tool_calls(resp.json())
 
     async def chat(self, messages: list[dict]) -> str:
         parts = []
