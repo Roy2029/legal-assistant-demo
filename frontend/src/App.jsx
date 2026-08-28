@@ -671,35 +671,6 @@ function KbPage() {
     if (d.ok) { message.success(`已上传：${d.data.name}（${d.data.children} chunks）到 ${folder || 'default'}`) } else { message.error(`${file.name}: ` + (d.error?.message || '上传失败')) }
   }
 
-  async function openEditor(c) {
-    setEditingContract(c); setEditContent(''); setEditFile(undefined); setEditFiles([])
-    try {
-      const r = await fetch(`/api/contracts/${c.contract_id}/files`)
-      const d = await r.json()
-      if (d.ok) { setEditFiles(d.data || []); if (d.data?.length) setEditFile(d.data[0]) }
-    } catch (e) { message.error('获取文件列表失败: ' + e.message) }
-  }
-
-  async function loadEditContent(file) {
-    if (!editingContract || !file) return
-    const r = await fetch(`/api/contracts/${editingContract.contract_id}/content?file=` + encodeURIComponent(file))
-    const d = await r.json()
-    if (d.ok) { setEditContent(d.data.content) } else { message.error(d.error?.message || '读取失败') }
-  }
-
-  async function saveEdit() {
-    if (!editingContract || !editFile || editSaving) return
-    setEditSaving(true)
-    try {
-      const r = await fetch(`/api/contracts/${editingContract.contract_id}/content`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file: editFile, content: editContent }),
-      })
-      const d = await r.json()
-      if (d.ok) { message.success(`已保存编辑版：${d.data.file}`); setEditingContract(null); loadContracts() } else { message.error(d.error?.message || '保存失败') }
-    } catch (e) { message.error('保存失败: ' + e.message) } finally { setEditSaving(false) }
-  }
-
   async function uploadFiles(fileList) {
     const files = Array.from(fileList || [])
     if (!files.length || uploading) return
@@ -831,6 +802,35 @@ function ContractPage() {
 
   function loadContracts() {
     fetch('/api/contracts').then((r) => r.json()).then((d) => setContracts(d.data || []))
+  }
+
+  async function openEditor(c) {
+    setEditingContract(c); setEditContent(''); setEditFile(undefined); setEditFiles([])
+    try {
+      const r = await fetch(`/api/contracts/${c.contract_id}/files`)
+      const d = await r.json()
+      if (d.ok) { setEditFiles(d.data || []); if (d.data?.length) setEditFile(d.data[0]) }
+    } catch (e) { message.error('获取文件列表失败: ' + e.message) }
+  }
+
+  async function loadEditContent(file) {
+    if (!editingContract || !file) return
+    const r = await fetch(`/api/contracts/${editingContract.contract_id}/content?file=` + encodeURIComponent(file))
+    const d = await r.json()
+    if (d.ok) { setEditContent(d.data.content) } else { message.error(d.error?.message || '读取失败') }
+  }
+
+  async function saveEdit() {
+    if (!editingContract || !editFile || editSaving) return
+    setEditSaving(true)
+    try {
+      const r = await fetch(`/api/contracts/${editingContract.contract_id}/content`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file: editFile, content: editContent }),
+      })
+      const d = await r.json()
+      if (d.ok) { message.success(`已保存编辑版：${d.data.file}`); setEditingContract(null); loadContracts() } else { message.error(d.error?.message || '保存失败') }
+    } catch (e) { message.error('保存失败: ' + e.message) } finally { setEditSaving(false) }
   }
   useEffect(() => { loadContracts() }, [])
 
