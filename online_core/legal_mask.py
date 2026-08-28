@@ -118,21 +118,31 @@ def _clean_sensitive_info(text: str) -> Tuple[str, Dict[str, str]]:
         if surname in full_names:
             mapping_dict[f"{{{{PARTY_{code}}}}}"] = full_names[surname]
 
-    # ── Layer 1: unique identifiers ───────────────────────────────────────
-    # Use lookahead/lookbehind instead of \b — Chinese chars are \w in Python
-    text = re.sub(r"(?<!\d)\d{17}[\dXx](?!\d)", "{{ID}}", text)
-    text = re.sub(r"(?<!\d)1[3-9]\d{9}(?!\d)", "{{PHONE}}", text)
-    text = re.sub(
-        r"(?<![0-9A-Z])[0-9A-HJ-NPQRTUWXY]{2}\d{6}[0-9A-HJ-NPQRTUWXY]{10}(?![0-9A-Z])",
-        "{{CREDIT_CODE}}",
-        text,
-    )
+    # ── Layer 1: unique identifiers（带编号，可精确还原）─────────────────
+    def _replace_numbered(text, pattern, base):
+        counter = 1
+        out = []
+        pos = 0
+        for m in re.finditer(pattern, text):
+            original = m.group(0)
+            placeholder = f"{{{{{base}_{counter}}}}}"
+            mapping_dict[placeholder] = original
+            out.append(text[pos:m.start()])
+            out.append(placeholder)
+            pos = m.end()
+            counter += 1
+        out.append(text[pos:])
+        return "".join(out)
 
-    # ── Layer 2: amounts ──────────────────────────────────────────────────
-    text = re.sub(r"[\d,]+\.?\d*\s*(?:万元|亿元|元|美元|英镑|港币)", "{{AMOUNT}}", text)
-    text = re.sub(r"\d+\.?\d*\s*(?:万元|亿元|元)", "{{AMOUNT}}", text)
-    text = re.sub(r"\d+\.?\d*\s*元/(?:月|日|年)", "{{AMOUNT}}/周期", text)
-    text = re.sub(r"\b\d+\.?\d*%\b", "{{PERCENT}}", text)
+    text = _replace_numbered(text, r"(?<!\d)\d{17}[\dXx](?!\d)", "ID")
+    text = _replace_numbered(text, r"(?<!\d)1[3-9]\d{9}(?!\d)", "PHONE")
+    text = _replace_numbered(text, r"(?<![0-9A-Z])[0-9A-HJ-NPQRTUWXY]{2}\d{6}[0-9A-HJ-NPQRTUWXY]{10}(?![0-9A-Z])", "CREDIT_CODE")
+
+    # ── Layer 2: amounts（带编号，可精确还原）───────────────────────────
+    text = _replace_numbered(text, r"[\d,]+\.?\d*\s*(?:万元|亿元|元|美元|英镑|港币)", "AMOUNT")
+    text = _replace_numbered(text, r"\d+\.?\d*\s*(?:万元|亿元|元)", "AMOUNT")
+    text = _replace_numbered(text, r"\d+\.?\d*\s*元/(?:月|日|年)", "AMOUNT_PERIOD")
+    text = _replace_numbered(text, r"\b\d+\.?\d*%\b", "PERCENT")
     text = re.sub(r"年利率\s*\d+\.?\d*%", "年利率{{PERCENT}}", text)
     text = re.sub(r"日利率\s*\d+\.?\d*%", "日利率{{PERCENT}}", text)
 
