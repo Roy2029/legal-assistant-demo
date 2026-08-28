@@ -62,6 +62,19 @@ def test_contract_flow(tmp_path):
     print("PASS contract_flow")
 
 
+def test_upload_skill_md():
+    skill_content = "# 用户 skill\n\n1. 先看合同\n2. 再查规则\n".encode("utf-8")
+    r = client.post("/api/contracts/skills", files={"file": ("我的审查流程.md", skill_content, "text/markdown")})
+    assert r.status_code == 200 and r.json()["ok"], r.text
+    assert r.json()["data"]["type"] == "skill"
+    r = client.get("/api/contracts/skills")
+    assert r.json()["ok"]
+    assert "我的审查流程.md" in r.json()["data"]["skills"]
+    # 清理
+    Path("skills/contract_review/user_skills/我的审查流程.md").unlink(missing_ok=True)
+    print("PASS upload_skill_md")
+
+
 if __name__ == "__main__":
     import tempfile
     with tempfile.TemporaryDirectory() as d:

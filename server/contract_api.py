@@ -17,6 +17,7 @@ MAPPING_ROOT = PROJECT_ROOT / "data" / "contracts" / "mappings"
 REPORT_ROOT = PROJECT_ROOT / "data" / "contracts" / "reports"
 WORKSPACE_ROOT = PROJECT_ROOT / "data" / "agent_workspace"
 USER_RULES_DIR = PROJECT_ROOT / "skills" / "contract_review" / "user_rules"
+USER_SKILLS_DIR = PROJECT_ROOT / "skills" / "contract_review" / "user_skills"
 BUILTIN_RULES = PROJECT_ROOT / "skills" / "contract_review" / "rules.jsonl"
 
 SUPPORTED = {".docx", ".pdf"}
@@ -134,113 +135,63 @@ def list_contracts():
 @router.get("/skills")
 def list_user_skills():
     USER_RULES_DIR.mkdir(parents=True, exist_ok=True)
-    return {"ok": True, "data": [p.name for p in sorted(USER_RULES_DIR.glob("*.jsonl"))]}
+    USER_SKILLS_DIR.mkdir(parents=True, exist_ok=True)
+    return {"ok": True, "data": {
+        "rules": [p.name for p in sorted(USER_RULES_DIR.glob("*.jsonl"))],
+        "skills": [p.name for p in sorted(USER_SKILLS_DIR.glob("*.md"))],
+    }}
 
 
 @router.post("/skills")
 async def upload_skill(file: UploadFile = File(...)):
-    """上传用户自定义合同审查规则（JSONL，字段与 rules.jsonl 一致）。"""
+    """上传用户自定义合同审查规则（.jsonl）或领域/流程 skill（.md）。"""
     filename = Path(file.filename or "untitled").name
-    if Path(filename).suffix.lower() != ".jsonl":
-        return JSONResponse({"ok": False, "error": {"code": "bad_format", "message": "仅支持 .jsonl 规则文件"}}, status_code=400)
-    USER_RULES_DIR.mkdir(parents=True, exist_ok=True)
-    dst = USER_RULES_DIR / filename
-    content = await file.read()
-    # 校验 JSONL
-    try:
-        for line in content.decode("utf-8").splitlines():
-            if line.strip():
-                json.loads(line)
-    except Exception as e:
-        return JSONResponse({"ok": False, "error": {"code": "bad_jsonl", "message": f"JSONL 解析失败: {e}"}}, status_code=400)
-    dst.write_bytes(content)
-    return {"ok": True, "data": {"filename": filename}}
-
-
-def _load_rules() -> list[dict]:
-    rules = []
-    for path in [BUILTIN_RULES, *sorted(USER_RULES_DIR.glob("*.jsonl"))]:
-        if not path.exists():
-            continue
+    ext = Path(filename).suffix.lower()
+    if ext == ".jsonl":
+        USER_RULES_DIR.mkdir(parents=True, exist_ok=True)
+        dst = USER_RULES_DIR / filename
+        content = await file.read()
         try:
-            for line in path.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if not line:
-                    continue
-                rule = json.loads(line)
-                if rule.get("status", "enabled") != "disabled":
-                    rules.append(rule)
-        except Exception:
-            continue
-    return rules
+            for line in content.decode("utf-8").splitlines():
+                if line.strip():
+                    json.loads(line)
+        except Exception as e:
+            return JSONResponse({"ok": False, "error": {"code": "bad_jsonl", "message": f"JSONL 解析失败: {e}"}}, status_code=400)
+        dst.write_bytes(content)
+        return {"ok": True, "data": {"filename": filename, "type": "rules"}}
+    if ext == ".md":
+        USER_SKILLS_DIR.mkdir(parents=True, exist_ok=True)
+        dst = USER_SKILLS_DIR / filename
+        content = await file.read()
+        dst.write_bytes(content)
+        return {"ok": True, "data": {"filename": filename, "type": "skill"}}
+    return JSONResponse({"ok": False, "error": {"code": "bad_format", "message": "仅支持 .jsonl 规则文件或 .md skill 文件"}}, status_code=400)
 
 
 def _run_rule_review(cid: str) -> dict:
+    from online_core import contract_rules
     files = _list_redacted_files(cid)
     if not files:
         return {"ok": False, "error": "没有可审查的脱敏文件"}
-
-    rules = _load_rules()
     risks = []
     for path in files:
         text = _extract_text(path)
-        for rule in rules:
-            patterns = (rule.get("trigger") or {}).get("patterns") or []
-            for pat in patterns:
-                if not pat:
-                    continue
-                idx = text.find(pat)
-                if idx >= 0:
-                    snippet = text[max(0, idx - 40):idx + 120].replace("\n", " ")
-                    risks.append({
-                        "rule_id": rule.get("rule_id"),
-                        "dimension": rule.get("dimension"),
-                        "risk_level": rule.get("risk_level"),
-                        "risk_desc": rule.get("risk_desc"),
-                        "suggestion": rule.get("suggestion_template"),
-                        "basis": rule.get("basis") or [],
-                        "source": rule.get("source", ""),
-                        "file": path.name,
-                        "snippet": snippet,
-                    })
-                    break  # 同一规则同一文件只记一次
-
-    # 去重：同一 rule_id + file 只保留一条
-    seen = set()
-    deduped = []
-    for r in risks:
-        key = (r["rule_id"], r["file"])
-        if key not in seen:
-            seen.add(key)
-            deduped.append(r)
-    risks = deduped
-
-    high = [r for r in risks if r["risk_level"] == "high"]
-    medium = [r for r in risks if r["risk_level"] == "medium"]
-    low = [r for r in risks if r["risk_level"] == "low"]
-
-    report = f"# 合同审查报告\n\n"
-    report += f"- 合同：{', '.join(p.name for p in files)}\n"
-    report += f"- 风险总数：{len(risks)}（高 {len(high)} / 中 {len(medium)} / 低 {len(low)}）\n\n"
-    report += "## 风险清单\n\n"
-    if not risks:
-        report += "未命中内置规则。\n"
-    for r in risks:
-        report += f"### [{r['risk_level']}] {r['dimension']} — {r['rule_id']}\n"
-        report += f"- 说明：{r['risk_desc']}\n"
-        report += f"- 建议：{r['suggestion']}\n"
-        report += f"- 原文片段：{r['snippet']}\n"
-        if r["basis"]:
-            report += f"- 依据：{r['basis']}\n"
-        report += "\n"
-    report += "---\n本报告由规则引擎生成，仅供参考，使用前须经执业律师核阅。\n"
+        risks.extend(contract_rules.scan_text(text, file_name=path.name))
+    risks = []
+    for path in files:
+        text = _extract_text(path)
+        risks.extend(contract_rules.scan_text(text, file_name=path.name))
+    report = contract_rules.render_report([p.name for p in files], risks)
 
     report_dir = REPORT_ROOT / cid
     report_dir.mkdir(parents=True, exist_ok=True)
     report_path = report_dir / "report.md"
     report_path.write_text(report, encoding="utf-8")
+    high = sum(1 for r in risks if r["risk_level"] == "high")
+    medium = sum(1 for r in risks if r["risk_level"] == "medium")
+    low = sum(1 for r in risks if r["risk_level"] == "low")
     _update_contract(cid, status="reviewed", report_path=str(report_path), risk_count=len(risks))
-    return {"ok": True, "risk_count": len(risks), "high": len(high), "medium": len(medium), "low": len(low), "report": report, "risks": risks}
+    return {"ok": True, "risk_count": len(risks), "high": high, "medium": medium, "low": low, "report": report, "risks": risks}
 
 
 @router.post("/{contract_id}/review")
@@ -307,6 +258,35 @@ def download_contract(contract_id: str, kind: str = "redacted", file: str | None
     if not files:
         return JSONResponse({"ok": False, "error": {"code": "no_file", "message": "脱敏文件不存在"}}, status_code=404)
     return FileResponse(files[0], filename=files[0].name)
+
+
+@router.post("/{contract_id}/agent-review")
+async def agent_review_contract(contract_id: str):
+    """LLM 驱动的合同审查 agent（ReAct）。未配置 LLM 时回退规则引擎。"""
+    from server.llm import llm_client
+    if not llm_client.configured:
+        result = _run_rule_review(contract_id)
+        if not result.get("ok"):
+            return JSONResponse(result, status_code=400)
+        result["agent"] = "rule_engine_fallback"
+        return result
+
+    from online_core.agents.contract_agent import ContractAgent
+    agent = ContractAgent(contract_id=contract_id)
+    result = await agent.run("请审查工作区内的合同并提交报告。")
+    if not result.get("ok"):
+        return JSONResponse({"ok": False, "error": {"code": "agent_failed", "message": result.get("report", "审查失败")}}, status_code=400)
+
+    report_dir = REPORT_ROOT / contract_id
+    report_dir.mkdir(parents=True, exist_ok=True)
+    report_path = report_dir / "report.md"
+    report_path.write_text(result.get("report", ""), encoding="utf-8")
+    risks = result.get("risks") or []
+    high = sum(1 for r in risks if r.get("risk_level") == "high")
+    medium = sum(1 for r in risks if r.get("risk_level") == "medium")
+    low = sum(1 for r in risks if r.get("risk_level") == "low")
+    _update_contract(contract_id, status="reviewed", report_path=str(report_path), risk_count=len(risks))
+    return {"ok": True, "agent": "contract_review", "risk_count": len(risks), "high": high, "medium": medium, "low": low, "report": result.get("report", ""), "answer": result.get("answer", ""), "needs_human": result.get("needs_human", False), "risks": risks}
 
 
 @router.delete("/{contract_id}")
