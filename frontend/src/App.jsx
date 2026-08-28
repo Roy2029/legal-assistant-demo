@@ -429,6 +429,39 @@ function AssistantPage() {
   const [finalReport, setFinalReport] = useState('')
   const [running, setRunning] = useState(false)
   const [traceId, setTraceId] = useState(null)
+  const [sessions, setSessions] = useState([])
+  const [sessionId, setSessionId] = useState(null)
+  const [history, setHistory] = useState([])
+
+  useEffect(() => { loadSessions() }, [])
+
+  async function loadSessions() {
+    const r = await fetch('/api/sessions?mode=assistant')
+    const d = await r.json()
+    if (d.ok) {
+      const ss = d.data || []
+      setSessions(ss)
+      if (ss.length) { setSessionId(ss[0].session_id); loadMessages(ss[0].session_id) } else { setSessionId(null); setHistory([]) }
+    }
+  }
+
+  async function loadMessages(sid) {
+    const r = await fetch('/api/sessions/' + sid + '/messages')
+    const d = await r.json()
+    if (d.ok) setHistory(d.data.map((m) => ({ role: m.role, content: m.content })))
+  }
+
+  async function newSession() {
+    const r = await fetch('/api/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: '新会话', mode: 'assistant' }) })
+    const d = await r.json()
+    if (d.ok) { setSessionId(d.data.session_id); setHistory([]); loadSessions() }
+  }
+
+  async function deleteSession() {
+    if (!sessionId) return
+    await fetch('/api/sessions/' + sessionId, { method: 'DELETE' })
+    setSessionId(null); setHistory([]); loadSessions()
+  }
 
   const modes = [
     { key: 'case_analysis', name: '案件分析', desc: '主 agent：按 skill 步骤调度工具', status: '可用' },
@@ -443,7 +476,7 @@ function AssistantPage() {
     if (mode === 'contract_review') { message.info('合同审查 agent 待开发，敬请期待'); return }
     setSteps([]); setFinalText(''); setFinalReport(''); setRunning(true)
     const url = mode === 'case_analysis' ? '/api/assistant' : (mode === 'rag' ? '/api/rag-agent' : '/api/case-agent')
-    const body = mode === 'case_analysis' ? { action: 'case_analysis', query: q } : { query: q }
+    const body = mode === 'case_analysis' ? { action: 'case_analysis', query: q, session_id: sessionId } : { query: q, session_id: sessionId }
     const resp = await fetch(url, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -478,12 +511,19 @@ function AssistantPage() {
       }
     }
     setRunning(false)
+    if (sessionId) { loadMessages(sessionId); loadSessions() }
   }
 
   return (
     <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
       <Card style={{ width: 320, flexShrink: 0 }} title="Tool Agent" size="small">
         <Space direction="vertical" style={{ width: '100%' }}>
+          <Space wrap>
+            <Select size="small" style={{ width: 160 }} value={sessionId} onChange={(v) => { setSessionId(v); loadMessages(v) }}
+              options={sessions.map((s) => ({ value: s.session_id, label: s.title || s.session_id.slice(0, 8) }))} />
+            <Button size="small" onClick={newSession}>新建会话</Button>
+            <Button size="small" danger onClick={deleteSession} disabled={!sessionId}>删除</Button>
+          </Space>
           {modes.map((m) => (
             <Card key={m.key} size="small" hoverable onClick={() => setMode(m.key)}
               style={{ border: mode === m.key ? '1px solid #1677ff' : undefined }}>
@@ -502,6 +542,16 @@ function AssistantPage() {
             <Button type="primary" onClick={run} loading={running}>{running ? '执行中...' : '执行'}</Button>
             {mode === 'case' && <Text type="secondary" style={{ fontSize: 12 }}>类案检索需要先在设置页填写裁判文书网账号</Text>}
           </Space>
+          {history.length > 0 && !steps.length && (
+            <div style={{ maxHeight: 300, overflow: 'auto' }}>
+              {history.map((m, i) => (
+                <div key={i} style={{ marginBottom: 8, textAlign: m.role === 'user' ? 'right' : 'left' }}>
+                  <Tag color={m.role === 'user' ? 'blue' : 'green'}>{m.role === 'user' ? '你' : '助手'}</Tag>
+                  <div style={{ display: 'inline-block', maxWidth: '85%', textAlign: 'left', background: m.role === 'user' ? '#e6f7ff' : '#f6ffed', padding: '6px 10px', borderRadius: 8, whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                </div>
+              ))}
+            </div>
+          )}
           {steps.length > 0 && (
             <List size="small" dataSource={steps} renderItem={(s, i) => (
               <List.Item key={i}>

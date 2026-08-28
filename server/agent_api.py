@@ -8,6 +8,8 @@ from typing import Optional
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
+from .session_utils import append_message, ensure_session
+
 router = APIRouter(prefix="/api")
 
 
@@ -16,6 +18,8 @@ def _sse(payload: dict) -> str:
 
 
 async def _run_rag_agent(query: str, session_id: str, folders: Optional[list[str]]):
+    session_id = ensure_session(session_id, mode="assistant", action="rag", title=query[:20] or "新会话")
+    append_message(session_id, "user", query, msg_kind="user")
     import asyncio
     from online_core.agents.rag_agent import RAGAgent
     agent = RAGAgent(session_id=session_id)
@@ -48,11 +52,17 @@ async def _run_rag_agent(query: str, session_id: str, folders: Optional[list[str
         "citations": result.get("citations", []),
         "needs_human": result.get("needs_human", False),
     })
+    final_content = result.get("answer", "")
+    if result.get("report"):
+        final_content += "\n\n---\n" + result.get("report", "")
+    append_message(session_id, "assistant", final_content, msg_kind="final")
     yield _sse({"type": "final", "answer": result.get("answer", ""), "report": result.get("report", ""), "citations": result.get("citations", []), "needs_human": result.get("needs_human", False)})
     yield _sse({"type": "done"})
 
 
 async def _run_case_agent(query: str, session_id: str):
+    session_id = ensure_session(session_id, mode="assistant", action="case", title=query[:20] or "新会话")
+    append_message(session_id, "user", query, msg_kind="user")
     import asyncio
     from online_core.agents.case_agent import CaseAgent
     agent = CaseAgent(session_id=session_id)
@@ -85,6 +95,10 @@ async def _run_case_agent(query: str, session_id: str):
         "citations": result.get("citations", []),
         "needs_human": result.get("needs_human", False),
     })
+    final_content = result.get("answer", "")
+    if result.get("report"):
+        final_content += "\n\n---\n" + result.get("report", "")
+    append_message(session_id, "assistant", final_content, msg_kind="final")
     yield _sse({"type": "final", "answer": result.get("answer", ""), "report": result.get("report", ""), "citations": result.get("citations", []), "needs_human": result.get("needs_human", False)})
     yield _sse({"type": "done"})
 

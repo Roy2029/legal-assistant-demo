@@ -11,6 +11,7 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
 from .llm import llm_client
+from .session_utils import append_message, ensure_session
 
 router = APIRouter(prefix="/api")
 
@@ -95,13 +96,15 @@ def analyze_step(query: str, tool_results: dict) -> str:
     return f"[M0 桩] 已基于检索资料生成初步分析框架（工具结果 {json.dumps(tool_results, ensure_ascii=False)[:300]}）。"
 
 
-async def assistant_event_gen(action: str, query: str):
+async def assistant_event_gen(action: str, query: str, session_id: str | None = None):
     skill = get_skill(action)
     trace_id = uuid.uuid4().hex
     if skill is None:
         yield f"data: {json.dumps({'type': 'error', 'code': 'unknown_action', 'message': f'未找到业务动作 {action}'}, ensure_ascii=False)}\n\n"
         return
-    yield f"data: {json.dumps({'type': 'session_start', 'action': action, 'skill_id': skill['skill_id'], 'trace_id': trace_id}, ensure_ascii=False)}\n\n"
+    session_id = ensure_session(session_id, mode="assistant", action=action, title=query[:20] or "新会话")
+    append_message(session_id, "user", query, msg_kind="user")
+    yield f"data: {json.dumps({'type': 'session_start', 'action': action, 'skill_id': skill['skill_id'], 'trace_id': trace_id, 'session_id': session_id}, ensure_ascii=False)}\n\n"
     tool_results = {}
     for step in skill.get("steps", []):
         yield f"data: {json.dumps({'type': 'step_start', 'step': step.get('id')}, ensure_ascii=False)}\n\n"
@@ -149,7 +152,10 @@ async def assistant_event_gen(action: str, query: str):
             summary = analyze_step(query, tool_results)
             yield f"data: {json.dumps({'type': 'step_end', 'step': step.get('id'), 'summary': summary}, ensure_ascii=False)}\n\n"
     final_text = analyze_step(query, tool_results)
-    yield f"data: {json.dumps({'type': 'final', 'answer': final_text}, ensure_ascii=False)}\n\n"
+    if tool_results.get("search_law") and tool_results["search_law"].get("answer"):
+        final_text = tool_results["search_law"]["answer"]
+    append_message(session_id, "assistant", final_text, msg_kind="final")
+    yield f"data: {json.dumps({'type': 'final', 'answer': final_text, 'session_id': session_id}, ensure_ascii=False)}\n\n"
     yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
 
 
@@ -166,4 +172,5 @@ async def assistant(payload: dict):
         return {"ok": False, "error": {"code": "empty_action", "message": "action 不能为空"}}
     if not query:
         return {"ok": False, "error": {"code": "empty_query", "message": "query 不能为空"}}
-    return StreamingResponse(assistant_event_gen(action, query), media_type="text/event-stream")
+    session_id = payload.get("session_id")
+    return StreamingResponse(assistant_event_gen(action, query, session_id), media_type="text/event-stream")

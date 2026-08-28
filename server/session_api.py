@@ -16,18 +16,25 @@ def create_session(payload: dict | None = None):
     session_id = uuid.uuid4().hex
     title = (payload or {}).get("title") or "新会话"
     mode = (payload or {}).get("mode") or "chat"
+    action = (payload or {}).get("action") or ""
     engine = get_engine()
     with engine.begin() as conn:
-        conn.execute(sa.text("INSERT INTO sessions (session_id, mode, title) VALUES (:s, :m, :t)"), {"s": session_id, "m": mode, "t": title})
+        conn.execute(sa.text("INSERT INTO sessions (session_id, mode, action, title) VALUES (:s, :m, :a, :t)"), {"s": session_id, "m": mode, "a": action, "t": title})
     engine.dispose()
-    return {"ok": True, "data": {"session_id": session_id, "title": title}}
+    return {"ok": True, "data": {"session_id": session_id, "title": title, "mode": mode, "action": action}}
 
 
 @router.get("")
-def list_sessions():
+def list_sessions(mode: str | None = None):
     engine = get_engine()
+    sql = "SELECT session_id, mode, action, title, created_at FROM sessions"
+    params = {}
+    if mode:
+        sql += " WHERE mode=:m"
+        params["m"] = mode
+    sql += " ORDER BY created_at DESC"
     with engine.begin() as conn:
-        rows = conn.execute(sa.text("SELECT session_id, mode, title, created_at FROM sessions ORDER BY created_at DESC")).fetchall()
+        rows = conn.execute(sa.text(sql), params).fetchall()
     engine.dispose()
     return {"ok": True, "data": [dict(r._mapping) for r in rows]}
 
