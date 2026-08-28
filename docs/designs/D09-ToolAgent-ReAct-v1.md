@@ -97,7 +97,11 @@ kb_search(plan)   // RAG agent 调用的工具
 - 文本解析易格式漂移、trace 不干净；
 - D04 已定调：`think` 用普通 content 文本，`act` 用结构化 tool_call。
 
-### 3.2 消息结构（每一轮）
+### 3.2 并发上限
+
+模型单轮可返回多个 tool_calls；v1 上限 **2 个并发**，且仅当两个调用都属于只读工具（kb_index/kb_search/read_file）时才并发执行；含 write_file/finish 时退化为串行。
+
+### 3.3 消息结构（每一轮）
 
 ```
 messages = [system, *history(压缩后)]
@@ -298,7 +302,8 @@ loop:
 
 ### 7.2 循环内压缩
 
-- 复用 `server/context_compressor.py` 的估算逻辑，阈值改为 **60,000 tokens**（DeepSeek 保守值，后续按模型上下文调整）；
+- DeepSeek 模型支持 1M 上下文（用户确认），v1 循环内压缩阈值设为 **200,000 tokens**（`RAG_AGENT_CONTEXT_MAX_TOKENS`，可配置），既远低于硬上限，又避免过长 prompt 带来的成本与延迟；
+- 复用 `server/context_compressor.py` 的估算逻辑；
 - 压缩策略：保留 system + 最近 4 条消息；更早的 tool_result 用结构化摘要替换（`[已压缩] tool=kb_search groups=2 results=12 ...`）；
 - v1 无 LLM 摘要时，用规则生成摘要占位。
 
@@ -326,25 +331,39 @@ loop:
 
 ---
 
-## 9. 类案检索 agent（v1 接口与骨架）
+## 9. 类案检索 agent（v1：MCP 接入 + 渐进式读取）
 
 ### 9.1 定位
 
-类案检索 agent 也是主 Agent 的顶级工具 `retrieve_case`。v1 只做离线骨架，MCP 爬虫就绪后替换数据源。
+类案检索 agent 是主 Agent 的顶级工具 `retrieve_case`。数据源接入 **裁判文书检索 MCP**（项目路径：`D:\个人开发\裁判文书检索MCP`）。
 
-### 9.2 渐进式读取工具
+### 9.2 MCP 工具映射
 
-| 工具 | 说明 |
-|---|---|
-| `case_search` | 按案由/关键词/法院/日期检索，返回**元数据页**（总数、案号、标题、案由、法院、日期，不返回全文） |
-| `case_read` | 按 case_id 读取文书指定段落（默认先返回“本院认为”前 800 字） |
-| `case_summary` | 对单篇文书生成结构化摘要（焦点/说理/裁判结果） |
+| MCP 工具（裁判文书检索MCP） | 类案 agent 工具 | 说明 |
+|---|---|---|
+| `init_session` | `case_init` | 初始化会话（登录态检查），首次使用必调 |
+| `search_judgments_tool` | `case_search` | 高级检索；返回**元数据页**（总数/案号/案件名称/案由/法院/裁判日期/理由摘要），不返回全文 |
+| `get_judgment_by_case_number` | `case_read` | 按案号读取文书（渐进式：先取首部/事实/理由段） |
+| `search_legal_basis_cases` | `case_search_by_law` | 按法条依据检索类案 |
+| `search_guided_cases` | `case_guided` | 指导性案例检索 |
+| `search_reasoning_cases` | `case_reasoning` | 裁判说理检索（“本院认为”） |
+| `search_party_litigation` | `case_by_party` | 当事人诉讼检索 |
+| `search_judge_cases` | `case_by_judge` | 法官/审判人员检索 |
+| `get_dictionaries` | `case_dictionaries` | 案由/法院/案例等级等字典 |
+| `get_status` | `case_status` | 登录态/限流状态查询 |
 
-### 9.3 结果过多策略
+### 9.3 渐进式读取与结果过多策略
 
-- `case_search` 返回 `total` 和 `cursor`；
+- `case_search` 返回 `total` 和分页元数据；默认 page_size=15；
 - 总数 > 200 时，system prompt 强制要求 agent 优化关键词（缩小案由/法院/日期范围）后再查；
-- 每轮 `case_read` 最多读 5 篇，避免上下文爆炸。
+- 每轮 `case_read` 最多读 5 篇；单篇默认先返回“本院认为”前 800 字，需要时再读事实段/判决结果段；
+- 限流/验证码错误（MCP 返回 rate limit / captcha）时，agent 停止重试并 `finish(needs_human=true)`，避免触发反爬。
+
+### 9.4 v1 开发顺序
+
+1. 先实现 MCP Adapter（`online_core/mcp/wenshu_adapter.py`），用 subprocess/HTTP 方式连接 `D:\个人开发\裁判文书检索MCP` 的 MCP server；
+2. `case_search/case_read/...` 工具封装为本地工具并注册给类案 agent；
+3. 离线 mock 模式：MCP 不可用时返回结构化错误，不炸主流程。
 
 ---
 
@@ -392,8 +411,10 @@ loop:
 - [ ] `finish` 报告模板：查询思路 / 查询过程 / 回答 / 引用
 - [ ] SSE 事件扩展；`pipeline_traces` 落库
 
-### 阶段 7：类案检索 agent 骨架
-- [ ] `case_search/case_read/case_summary` 接口 + 离线空实现 + 渐进式读取测试
+### 阶段 7：类案检索 agent（MCP 接入）
+- [ ] MCP Adapter 连接 `D:\个人开发\裁判文书检索MCP`
+- [ ] `case_search/case_read/case_summary` 封装 + 渐进式读取测试
+- [ ] MCP 不可用时的降级返回 + `needs_human`
 
 ### 阶段 8：集成与验收
 - [ ] 主 Agent `search_law` 顶级工具接 RAG agent
@@ -418,8 +439,8 @@ loop:
 
 ## 13. 开放问题 / 待确认
 
-1. **DeepSeek function calling 的并发 tool_calls 数量**：v1 先按串行执行 tool_calls，避免并发副作用；是否允许并行后续看实测。
-2. **模型上下文**：deepseek-chat 上下文窗口以官方最新为准，60k 阈值是保守值，上线前需确认。
-3. **类案 MCP 合规与稳定性**：裁判文书网爬虫可能不稳，v1 类案数据源是否先用手工导入的离线案例 JSONL？
+1. ~~DeepSeek function calling 的并发 tool_calls 数量~~ → 已确认：**上限 2 个并发**，且仅只读工具可并发。
+2. ~~模型上下文~~ → 已确认：DeepSeek 支持 1M 上下文；循环内压缩阈值 200k（可配置）。
+3. ~~类案 MCP 合规与稳定性~~ → 已确认：接入 `D:\个人开发\裁判文书检索MCP`；v1 先开发，MCP 不可用时降级 `needs_human`。
 4. **主 Agent 与 RAG agent 的 think 重叠**：D04 主 Agent 也有 think，RAG agent 内部 think 是否要在前端都展示，还是只展示 RAG agent 的规划与报告？建议：主 Agent think 展示，RAG agent 只展示 plan/tool/report，避免刷屏。
-5. **workspace 文件清理**：`data/agent_workspace/` 是否需要按会话结束自动清理，还是保留 7 天？建议保留 7 天，M2 再做看板。
+5. ~~workspace 文件清理~~ → 已确认：`data/agent_workspace/` 保留 **14 天**，到期自动清理。
