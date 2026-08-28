@@ -228,6 +228,22 @@ def download_contract(contract_id: str, kind: str = "redacted", file: str | None
     if not row:
         return JSONResponse({"ok": False, "error": {"code": "not_found", "message": "合同不存在"}}, status_code=404)
 
+    if kind == "annotated":
+        files = _list_redacted_files(contract_id)
+        if file:
+            files = [p for p in files if p.name == file]
+        docx_files = [p for p in files if p.suffix.lower() == ".docx"]
+        if not docx_files:
+            return JSONResponse({"ok": False, "error": {"code": "no_docx", "message": "批注版仅支持 DOCX 合同"}}, status_code=404)
+        from online_core import contract_rules
+        out_dir = REPORT_ROOT / contract_id
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / f"{docx_files[0].stem}_批注版.docx"
+        n = contract_rules.annotate_docx(docx_files[0], out_path)
+        if n == 0:
+            return JSONResponse({"ok": False, "error": {"code": "no_risk", "message": "未命中风险，无需批注"}}, status_code=404)
+        return FileResponse(out_path, filename=out_path.name)
+
     if kind == "restored":
         # 读取脱敏文本，用 mapping 还原，输出 txt
         files = _list_redacted_files(contract_id)

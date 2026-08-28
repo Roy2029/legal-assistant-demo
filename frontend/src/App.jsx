@@ -858,6 +858,7 @@ function ContractPage() {
             <Button key="rv" size="small" type="primary" onClick={() => review(c.contract_id)}>审查</Button>,
             <Button key="rp" size="small" href={`/api/contracts/${c.contract_id}/report`} target="_blank" disabled={!c.report_path}>报告</Button>,
             <Button key="dl" size="small" href={`/api/contracts/${c.contract_id}/download?kind=redacted`} target="_blank">脱敏版</Button>,
+            <Button key="an" size="small" href={`/api/contracts/${c.contract_id}/download?kind=annotated`} target="_blank">批注版</Button>,
             <Button key="rs" size="small" href={`/api/contracts/${c.contract_id}/download?kind=restored`} target="_blank">还原版</Button>,
             <Button key="del" size="small" danger onClick={() => remove(c.contract_id)}>删除</Button>,
           ]}>

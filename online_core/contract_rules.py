@@ -62,6 +62,49 @@ def scan_text(text: str, rules: list[dict] | None = None, file_name: str = "") -
     return deduped
 
 
+def annotate_docx(input_path: str | Path, output_path: str | Path, rules: list[dict] | None = None) -> int:
+    """在脱敏 DOCX 上生成批注版：命中风险的段落黄色高亮，段后插入红色风险提示。
+
+    Returns: 批注数量
+    """
+    import docx
+    from docx.enum.text import WD_COLOR_INDEX
+    from docx.shared import RGBColor
+
+    rules = rules if rules is not None else load_rules()
+    doc = docx.Document(str(input_path))
+    notes = 0
+    for para in list(doc.paragraphs):
+        text = para.text or ""
+        if not text.strip():
+            continue
+        risks = scan_text(text, rules)
+        if not risks:
+            continue
+        # 高亮原段落
+        for run in para.runs:
+            try:
+                run.font.highlight_color = WD_COLOR_INDEX.YELLOW
+            except Exception:
+                pass
+        # 段后插入风险提示
+        note = doc.add_paragraph()
+        tip = "【风险提示】" + "；".join(
+            f"[{r['risk_level']}] {r['risk_desc']} → {r['suggestion']}" for r in risks
+        )
+        run = note.add_run(tip)
+        run.font.color.rgb = RGBColor(0xC0, 0x00, 0x00)
+        run.font.bold = True
+        # 把 note 从文末移动到当前段之后
+        try:
+            para._p.addnext(note._p)
+        except Exception:
+            pass
+        notes += 1
+    doc.save(str(output_path))
+    return notes
+
+
 def render_report(file_names: list[str], risks: list[dict]) -> str:
     high = [r for r in risks if r["risk_level"] == "high"]
     medium = [r for r in risks if r["risk_level"] == "medium"]

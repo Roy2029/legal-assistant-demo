@@ -54,6 +54,19 @@ def test_contract_flow(tmp_path):
     text = r.content.decode("utf-8")
     assert "张三" in text, "还原版应包含真实姓名"
 
+    # 下载批注版
+    r = client.get(f"/api/contracts/{cid}/download", params={"kind": "annotated"})
+    assert r.status_code == 200, r.text
+    import docx as dx
+    from tempfile import NamedTemporaryFile
+    with NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
+        tmp.write(r.content)
+        tmp_path = Path(tmp.name)
+    d = dx.Document(str(tmp_path))
+    all_text = "\n".join(p.text for p in d.paragraphs)
+    assert "风险提示" in all_text, "批注版应包含风险提示"
+    tmp_path.unlink(missing_ok=True)
+
     # 删除
     r = client.delete(f"/api/contracts/{cid}")
     assert r.json()["ok"]
