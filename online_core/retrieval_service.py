@@ -46,6 +46,73 @@ class RetrievalOutput:
     trace: dict = field(default_factory=dict)
 
 
+def build_kb_filters(
+    corpus_scope: str = "all",
+    user_folders: Optional[list[str]] = None,
+    folders: Optional[list[str]] = None,
+    pq_filter: Optional[dict] = None,
+) -> Optional[dict]:
+    """构造知识库范围 + 解析器过滤条件。
+
+    folders 优先级最高：[] = 全部；["__public__"] = 公共库；
+    ["a"] = 用户文件夹；["__public__","a"] = 公共库 OR 指定用户文件夹。
+    """
+    filters = None
+    must = []
+    base_should = None
+
+    if folders is not None:
+        public_selected = "__public__" in folders
+        user_selected = [f for f in folders if f != "__public__"]
+        if public_selected and user_selected:
+            base_should = [
+                {"key": "metadata.corpus", "match": {"value": "public"}},
+                {
+                    "must": [
+                        {"key": "metadata.corpus", "match": {"value": "user"}},
+                        {"key": "metadata.user_id", "match": {"value": "local"}},
+                        {"key": "metadata.folder", "match": {"any": user_selected}},
+                    ]
+                },
+            ]
+        elif public_selected:
+            must.append({"key": "metadata.corpus", "match": {"value": "public"}})
+        elif user_selected:
+            must.append({"key": "metadata.corpus", "match": {"value": "user"}})
+            must.append({"key": "metadata.user_id", "match": {"value": "local"}})
+            must.append({"key": "metadata.folder", "match": {"any": user_selected}})
+    elif user_folders:
+        must.append({"key": "metadata.corpus", "match": {"value": "user"}})
+        must.append({"key": "metadata.user_id", "match": {"value": "local"}})
+        must.append({"key": "metadata.folder", "match": {"any": list(user_folders)}})
+    elif corpus_scope == "public":
+        must.append({"key": "metadata.corpus", "match": {"value": "public"}})
+    elif corpus_scope == "user":
+        must.append({"key": "metadata.corpus", "match": {"value": "user"}})
+        must.append({"key": "metadata.user_id", "match": {"value": "local"}})
+
+    if pq_filter:
+        for k, v in pq_filter.items():
+            if k == "effect_level":
+                continue
+            if k == "article_no":
+                must.append({"key": "metadata.articles", "match": {"any": v if isinstance(v, list) else [v]}})
+                continue
+            key = f"metadata.{k}" if k in ("law_name", "article_no", "effect_level", "doc_type") else k
+            if isinstance(v, list):
+                must.append({"key": key, "match": {"any": v}})
+            else:
+                must.append({"key": key, "match": {"value": v}})
+
+    if base_should is not None:
+        filters = {"should": base_should}
+        if must:
+            filters["must"] = must
+    elif must:
+        filters = {"must": must}
+    return filters
+
+
 class RetrievalService:
     def __init__(self, config: RetrievalConfig | None = None):
         self.config = config or RetrievalConfig()
@@ -110,10 +177,19 @@ class RetrievalService:
                 self._reranker = None
         return self._reranker
 
-    def search(self, query: str, corpus_scope: str = "all", user_folders: Optional[list[str]] = None) -> RetrievalOutput:
+    def search(
+        self,
+        query: str,
+        corpus_scope: str = "all",
+        user_folders: Optional[list[str]] = None,
+        folders: Optional[list[str]] = None,
+    ) -> RetrievalOutput:
         """corpus_scope: all（public+本人 user）/ public / user。
 
         user_folders: 只检索这些用户文件夹（metadata.folder），传入后覆盖 corpus_scope。
+        folders: 统一知识库选择器，优先级高于 corpus_scope/user_folders。
+                 [] = 全部；["__public__"] = 公共库；["folderA"] = 用户文件夹；
+                 ["__public__","folderA"] = 公共库 OR 指定用户文件夹。
         """
         # 1. query 解析
         pq = parse_query(query)
@@ -122,33 +198,12 @@ class RetrievalService:
         # 3. 用户词典（查询期）
         apply_user_lexicon()
         # 4. 构造 Qdrant filter（元数据字段位于 payload.metadata 下，用嵌套 key）
-        filters = None
-        must = []
-        if user_folders:
-            must.append({"key": "metadata.corpus", "match": {"value": "user"}})
-            must.append({"key": "metadata.user_id", "match": {"value": "local"}})
-            must.append({"key": "metadata.folder", "match": {"any": list(user_folders)}})
-        elif corpus_scope == "public":
-            must.append({"key": "metadata.corpus", "match": {"value": "public"}})
-        elif corpus_scope == "user":
-            must.append({"key": "metadata.corpus", "match": {"value": "user"}})
-            must.append({"key": "metadata.user_id", "match": {"value": "local"}})
-        if pq.filter:
-            for k, v in pq.filter.items():
-                if k == "effect_level":
-                    # M0 未填充 effect_level 元数据，仅记录不强制过滤
-                    continue
-                if k == "article_no":
-                    # chunk 内含多条文，用 articles 列表 + any 匹配
-                    must.append({"key": "metadata.articles", "match": {"any": v if isinstance(v, list) else [v]}})
-                    continue
-                key = f"metadata.{k}" if k in ("law_name", "article_no", "effect_level", "doc_type") else k
-                if isinstance(v, list):
-                    must.append({"key": key, "match": {"any": v}})
-                else:
-                    must.append({"key": key, "match": {"value": v}})
-        if must:
-            filters = {"must": must}
+        filters = build_kb_filters(
+            corpus_scope=corpus_scope,
+            user_folders=user_folders,
+            folders=folders,
+            pq_filter=pq.filter or None,
+        )
         # 5. 混合检索（拆开 dense/sparse，暴露中间结果供 trace 展示）
         store = self._get_store()
         emb = self._get_embedding()
@@ -175,6 +230,7 @@ class RetrievalService:
                 "article_no": m.get("article_no", ""),
                 "chunk_level": r.chunk.chunk_level,
                 "corpus": m.get("corpus", ""),
+                "folder": m.get("folder", ""),
                 "doc_type": m.get("doc_type", ""),
                 "heading_path": r.chunk.heading_path or [],
             }
