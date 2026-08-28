@@ -32,6 +32,7 @@ def _default_config() -> dict[str, Any]:
     return {
         "llm": llm_env,
         "desensitize": {"enabled": True, "level": "standard"},
+        "wenshu": {"username": "", "password": ""},
         "retrieval": {
             "top_k": 8,
             "recall_top_k": 50,
@@ -61,13 +62,31 @@ class ConfigService:
                     cfg.update(loaded)
                 except Exception:
                     pass
+            # 敏感字段解密到内存，磁盘保持密文
+            try:
+                from .crypto import decrypt_secret
+                wenshu = cfg.get("wenshu") or {}
+                if wenshu.get("password"):
+                    wenshu["password"] = decrypt_secret(wenshu["password"])
+                cfg["wenshu"] = wenshu
+            except Exception:
+                pass
             self._cache = cfg
             return cfg
 
     def save(self, cfg: dict[str, Any]) -> None:
         with self._lock:
             CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-            CONFIG_PATH.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+            write_cfg = json.loads(json.dumps(cfg, ensure_ascii=False))
+            try:
+                from .crypto import encrypt_secret
+                wenshu = write_cfg.get("wenshu") or {}
+                if wenshu.get("password"):
+                    wenshu["password"] = encrypt_secret(wenshu["password"])
+                write_cfg["wenshu"] = wenshu
+            except Exception:
+                pass
+            CONFIG_PATH.write_text(json.dumps(write_cfg, ensure_ascii=False, indent=2), encoding="utf-8")
             self._cache = cfg
 
     def update(self, partial: dict[str, Any]) -> dict[str, Any]:
@@ -78,5 +97,8 @@ class ConfigService:
 
     def get_llm(self) -> dict[str, Any]:
         return self.load().get("llm", {})
+
+    def get_wenshu(self) -> dict[str, Any]:
+        return self.load().get("wenshu", {})
 
 config_service = ConfigService()

@@ -335,7 +335,10 @@ function SettingsPage() {
 
   useEffect(() => {
     fetch('/api/config').then((r) => r.json()).then((d) => {
-      if (d.ok) form.setFieldsValue({ base_url: d.data.llm?.base_url, api_key: d.data.llm?.api_key, model: d.data.llm?.model })
+      if (d.ok) form.setFieldsValue({
+        base_url: d.data.llm?.base_url, api_key: d.data.llm?.api_key, model: d.data.llm?.model,
+        wenshu_username: d.data.wenshu?.username || '', wenshu_password: d.data.wenshu?.password || '',
+      })
     })
     loadTerms()
   }, [])
@@ -346,9 +349,13 @@ function SettingsPage() {
 
   async function save() {
     const v = await form.validateFields()
-    const resp = await fetch('/api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ llm: v }) })
+    const payload = {
+      llm: { base_url: v.base_url, api_key: v.api_key, model: v.model },
+      wenshu: { username: v.wenshu_username || '', password: v.wenshu_password || '' },
+    }
+    const resp = await fetch('/api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     const d = await resp.json()
-    if (d.ok) message.success('已保存（热更新生效）')
+    if (d.ok) { message.success('已保存（热更新生效）') } else { message.error(d.error?.message || '保存失败') }
   }
 
   async function addTerm() {
@@ -361,14 +368,19 @@ function SettingsPage() {
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <Card title="LLM 配置（OpenAI 兼容 API）" style={{ maxWidth: 560 }}>
-        <Form form={form} layout="vertical">
+      <Form form={form} layout="vertical">
+        <Card title="LLM 配置（OpenAI 兼容 API）" style={{ maxWidth: 560 }}>
           <Form.Item name="base_url" label="Base URL" rules={[{ required: true }]}><Input placeholder="https://api.deepseek.com/v1" /></Form.Item>
           <Form.Item name="api_key" label="API Key" rules={[{ required: true }]}><Input.Password placeholder="sk-..." /></Form.Item>
           <Form.Item name="model" label="Model" rules={[{ required: true }]}><Input placeholder="deepseek-chat" /></Form.Item>
-          <Button type="primary" onClick={save}>保存配置</Button>
-        </Form>
-      </Card>
+        </Card>
+        <Card title="裁判文书网账号（类案检索）" style={{ maxWidth: 560, marginTop: 16 }}>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>用于裁判文书检索 MCP 登录；密码本地 Fernet 加密存储，仅存本机。</Text>
+          <Form.Item name="wenshu_username" label="账号"><Input placeholder="手机号/用户名" /></Form.Item>
+          <Form.Item name="wenshu_password" label="密码"><Input.Password placeholder="密码" /></Form.Item>
+        </Card>
+        <Button type="primary" onClick={save} style={{ marginTop: 8 }}>保存配置</Button>
+      </Form>
       <Card title="自定义关键词（检索期分词增强）" style={{ maxWidth: 560 }}>
         <Space.Compact style={{ width: '100%' }}>
           <Input value={termInput} onChange={(e) => setTermInput(e.target.value)} onPressEnter={addTerm} placeholder="输入领域术语，如：实际施工人" />
@@ -385,24 +397,31 @@ function SettingsPage() {
 }
 
 function AssistantPage() {
-  const [actions, setActions] = useState([])
-  const [action, setAction] = useState(null)
+  const [mode, setMode] = useState('rag')
   const [input, setInput] = useState('')
   const [steps, setSteps] = useState([])
   const [finalText, setFinalText] = useState('')
+  const [finalReport, setFinalReport] = useState('')
   const [running, setRunning] = useState(false)
   const [traceId, setTraceId] = useState(null)
 
-  useEffect(() => {
-    fetch('/api/actions').then((r) => r.json()).then((d) => setActions(d.data || []))
-  }, [])
+  const modes = [
+    { key: 'case_analysis', name: '案件分析', desc: '主 agent：按 skill 步骤调度工具', status: '可用' },
+    { key: 'rag', name: '知识库检索', desc: 'RAG agent：ReAct 多跳检索法律依据', status: '可用' },
+    { key: 'case', name: '类案检索', desc: 'Case agent：裁判文书 MCP 类案检索', status: '可用' },
+    { key: 'contract_review', name: '合同审查', desc: '合同审查 agent（待开发）', status: '待开发' },
+  ]
 
   async function run() {
-    if (!action || !input.trim() || running) return
-    setSteps([]); setFinalText(''); setRunning(true)
-    const resp = await fetch('/api/assistant', {
+    const q = input.trim()
+    if (!q || running) return
+    if (mode === 'contract_review') { message.info('合同审查 agent 待开发，敬请期待'); return }
+    setSteps([]); setFinalText(''); setFinalReport(''); setRunning(true)
+    const url = mode === 'case_analysis' ? '/api/assistant' : (mode === 'rag' ? '/api/rag-agent' : '/api/case-agent')
+    const body = mode === 'case_analysis' ? { action: 'case_analysis', query: q } : { query: q }
+    const resp = await fetch(url, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: action.skill_id, query: input.trim() }),
+      body: JSON.stringify(body),
     })
     const reader = resp.body.getReader()
     const decoder = new TextDecoder()
@@ -421,10 +440,10 @@ function AssistantPage() {
           else if (evt.type === 'step_start') setSteps((s) => [...s, { step: evt.step, status: 'running' }])
           else if (evt.type === 'tool_call') setSteps((s) => [...s, { tool: evt.tool, params: evt.params, status: 'tool' }])
           else if (evt.type === 'tool_result') setSteps((s) => [...s, { summary: evt.summary, status: 'done' }])
-          else if (evt.type === 'agent_start') setSteps((s) => [...s, { step: '知识库检索 agent', status: 'running' }])
+          else if (evt.type === 'agent_start') setSteps((s) => [...s, { step: (evt.agent === 'knowledge' ? '知识库检索 agent' : '类案检索 agent') + ' 启动', status: 'running' }])
           else if (evt.type === 'agent_report') setSteps((s) => [...s, { step: '检索报告', summary: evt.answer || (evt.needs_human ? '需人工介入' : '已生成'), status: 'done' }])
           else if (evt.type === 'step_end') setSteps((s) => [...s, { step: evt.step + ' 完成', summary: evt.summary, status: 'done' }])
-          else if (evt.type === 'final') setFinalText(evt.answer)
+          else if (evt.type === 'final') { setFinalText(evt.answer || ''); if (evt.report) setFinalReport(evt.report) }
           else if (evt.type === 'error') setFinalText('⚠️ ' + evt.message)
         } catch {}
       }
@@ -434,36 +453,36 @@ function AssistantPage() {
 
   return (
     <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-      <Card style={{ width: 360, flexShrink: 0 }} title="业务动作" size="small">
+      <Card style={{ width: 320, flexShrink: 0 }} title="Tool Agent" size="small">
         <Space direction="vertical" style={{ width: '100%' }}>
-          {actions.map((a) => (
-            <Card key={a.skill_id} size="small" hoverable onClick={() => setAction(a)}
-              style={{ border: action?.skill_id === a.skill_id ? '1px solid #1677ff' : undefined }}>
-              <Text strong>{a.name}</Text>
-              <div><Text type="secondary" style={{ fontSize: 12 }}>{a.description}</Text></div>
+          {modes.map((m) => (
+            <Card key={m.key} size="small" hoverable onClick={() => setMode(m.key)}
+              style={{ border: mode === m.key ? '1px solid #1677ff' : undefined }}>
+              <Space direction="vertical" size={0} style={{ width: '100%' }}>
+                <Space><Text strong>{m.name}</Text>{m.status === '待开发' ? <Tag color="orange">待开发</Tag> : <Tag color="green">可用</Tag>}</Space>
+                <Text type="secondary" style={{ fontSize: 12 }}>{m.desc}</Text>
+              </Space>
             </Card>
           ))}
         </Space>
       </Card>
       <Card style={{ flex: 1, minWidth: 0 }} title="执行" size="small">
-        {!action && <Text type="secondary">请先选择左侧业务动作</Text>}
-        {action && (
-          <Space direction="vertical" style={{ width: '100%' }}>
-            <Input.TextArea value={input} onChange={(e) => setInput(e.target.value)} placeholder="描述你的需求" autoSize={{ minRows: 2, maxRows: 5 }} />
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Input.TextArea value={input} onChange={(e) => setInput(e.target.value)} placeholder="输入法律问题或案情要点" autoSize={{ minRows: 2, maxRows: 5 }} disabled={running} />
+          <Space>
             <Button type="primary" onClick={run} loading={running}>{running ? '执行中...' : '执行'}</Button>
-            {steps.length > 0 && (
-              <List size="small" dataSource={steps} renderItem={(s, i) => (
-                <List.Item>
-                  <Tag color={s.status === 'done' ? 'green' : 'blue'}>{(s.step || s.tool || '') + (s.summary ? '：' + s.summary : '')}</Tag>
-                </List.Item>
-              )} />
-            )}
-            {finalText && <Markdown content={finalText} style={{ background: '#f6ffed', padding: 12, borderRadius: 8 }} />}
-            {finalText && !running && (
-              <Feedback mode="assistant" action={action?.skill_id} sessionId={null} traceId={traceId} query={input} answer={finalText} trace={steps} />
-            )}
+            {mode === 'case' && <Text type="secondary" style={{ fontSize: 12 }}>类案检索需要先在设置页填写裁判文书网账号</Text>}
           </Space>
-        )}
+          {steps.length > 0 && (
+            <List size="small" dataSource={steps} renderItem={(s, i) => (
+              <List.Item key={i}>
+                <Tag color={s.status === 'done' ? 'green' : 'blue'}>{(s.step || s.tool || '') + (s.summary ? '：' + s.summary : '')}</Tag>
+              </List.Item>
+            )} />
+          )}
+          {finalText && <Markdown content={finalText} style={{ background: '#f6ffed', padding: 12, borderRadius: 8 }} />}
+          {finalReport && <Markdown content={finalReport} style={{ background: '#fffbe6', padding: 12, borderRadius: 8 }} />}
+        </Space>
       </Card>
     </div>
   )
