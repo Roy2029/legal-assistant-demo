@@ -217,6 +217,9 @@ def doc_chunks(doc_id: str):
             filter_condition={"must": [{"key": "doc_id", "match": {"value": doc_id}}]},
             limit=500,
         )
+        # Qdrant scroll 默认按内部 point_id 顺序返回；这里按 chunker 写入的 order 排序，
+        # 保证与文档原文顺序一致（order 相同的按 chunk_id 稳定兜底）。
+        chunks.sort(key=lambda c: (c.order or 0, c.chunk_id))
         data = []
         for ch in chunks:
             meta = ch.metadata or {}
@@ -240,19 +243,16 @@ def doc_chunks(doc_id: str):
         return {"ok": False, "error": {"code": "chunk_list_failed", "message": str(e)}}
 
 
-def _find_chunk(doc_id: str, chunk_id: str):
+def _load_doc_chunks(doc_id: str) -> list[Chunk]:
+    """读取某文档全部 child chunk，并按原文顺序（order）排序。"""
     from online_core.retrieval_service import get_retrieval_service
     store = get_retrieval_service()._get_store()
     chunks, _ = store.scroll_paginated(
-        filter_condition={
-            "must": [
-                {"key": "doc_id", "match": {"value": doc_id}},
-                {"key": "chunk_id", "match": {"value": chunk_id}},
-            ]
-        },
-        limit=1,
+        filter_condition={"must": [{"key": "doc_id", "match": {"value": doc_id}}]},
+        limit=500,
     )
-    return chunks[0] if chunks else None
+    chunks.sort(key=lambda c: (c.order or 0, c.chunk_id))
+    return chunks
 
 
 def _make_user_chunk(doc_id: str, text: str, meta: dict, heading_path, order: int, parent_chunk_id: str | None = None) -> Chunk:
@@ -288,96 +288,98 @@ def _upsert_user_chunks(chunks: list[Chunk]) -> None:
     store.save(str(Path("D:/个人/legal-assistant-demo/data/indices/法律/qdrant")))
 
 
-def _delete_user_chunks(doc_id: str, chunk_ids: list[str]) -> None:
+def _rebuild_doc_chunks(doc_id: str, chunks: list[Chunk]) -> None:
+    """按给定 chunk 列表重建文档的全部检索点，并同步 SQLite chunk_count。
+
+    先按 doc_id 删除旧点，再重新嵌入；order 在调用方已按原文顺序排好。
+    """
     from online_core.retrieval_service import get_retrieval_service
     store = get_retrieval_service()._get_store()
-    for cid in chunk_ids:
-        store.delete_by_filter({
-            "must": [
-                {"key": "doc_id", "match": {"value": doc_id}},
-                {"key": "chunk_id", "match": {"value": cid}},
-            ]
-        })
+    store.delete_by_doc_id(doc_id)
     store.save(str(Path("D:/个人/legal-assistant-demo/data/indices/法律/qdrant")))
-
-
-def _update_chunk_count(doc_id: str, delta: int) -> None:
+    if chunks:
+        for i, c in enumerate(chunks):
+            c.order = i
+        _upsert_user_chunks(chunks)
     engine = get_engine()
     with engine.begin() as conn:
-        conn.execute(sa.text("UPDATE user_docs SET chunk_count = MAX(0, chunk_count + :d) WHERE doc_id=:id"), {"d": delta, "id": doc_id})
+        conn.execute(sa.text("UPDATE user_docs SET chunk_count=:c WHERE doc_id=:id"), {"c": len(chunks), "id": doc_id})
     engine.dispose()
 
 
 @router.put("/docs/{doc_id}/chunks/{chunk_id}")
 def edit_chunk(doc_id: str, chunk_id: str, payload: dict):
-    """编辑 chunk 文本：删除旧块，按新文本重建（chunk_id 随之变化）。"""
+    """编辑 chunk 文本：该块按新文本重建（chunk_id 随之变化），其余块保持原顺序。"""
     new_text = (payload.get("text") or "").strip()
     if not new_text:
         return {"ok": False, "error": {"code": "empty_text", "message": "文本不能为空"}}
-    ch = _find_chunk(doc_id, chunk_id)
-    if ch is None:
+    chunks = _load_doc_chunks(doc_id)
+    hit = None
+    for c in chunks:
+        if c.chunk_id == chunk_id:
+            hit = c
+            break
+    if hit is None:
         return {"ok": False, "error": {"code": "not_found", "message": "chunk 不存在"}}
-    _delete_user_chunks(doc_id, [chunk_id])
-    new_chunk = _make_user_chunk(doc_id, new_text, ch.metadata or {}, ch.heading_path, ch.order, ch.parent_chunk_id)
-    _upsert_user_chunks([new_chunk])
+    new_chunk = _make_user_chunk(doc_id, new_text, hit.metadata or {}, hit.heading_path, hit.order, hit.parent_chunk_id)
+    new_chunks = [new_chunk if c.chunk_id == chunk_id else c for c in chunks]
+    _rebuild_doc_chunks(doc_id, new_chunks)
     return {"ok": True, "data": {"chunk_id": new_chunk.chunk_id}}
 
 
 @router.post("/docs/{doc_id}/chunks/{chunk_id}/split")
 def split_chunk(doc_id: str, chunk_id: str, payload: dict):
-    """拆分 chunk 为两个新块。"""
+    """拆分 chunk 为两个新块，并按原文顺序重建整篇文档的 order。"""
     part1 = (payload.get("part1") or "").strip()
     part2 = (payload.get("part2") or "").strip()
     if not part1 or not part2:
         return {"ok": False, "error": {"code": "empty_parts", "message": "两段文本都不能为空"}}
-    ch = _find_chunk(doc_id, chunk_id)
-    if ch is None:
+    chunks = _load_doc_chunks(doc_id)
+    idx = next((i for i, c in enumerate(chunks) if c.chunk_id == chunk_id), None)
+    if idx is None:
         return {"ok": False, "error": {"code": "not_found", "message": "chunk 不存在"}}
-    _delete_user_chunks(doc_id, [chunk_id])
-    meta = ch.metadata or {}
-    c1 = _make_user_chunk(doc_id, part1, meta, ch.heading_path, ch.order, ch.parent_chunk_id)
-    c2 = _make_user_chunk(doc_id, part2, meta, ch.heading_path, ch.order + 1, ch.parent_chunk_id)
-    _upsert_user_chunks([c1, c2])
-    _update_chunk_count(doc_id, 1)
+    old = chunks[idx]
+    meta = old.metadata or {}
+    c1 = _make_user_chunk(doc_id, part1, meta, old.heading_path, idx, old.parent_chunk_id)
+    c2 = _make_user_chunk(doc_id, part2, meta, old.heading_path, idx + 1, old.parent_chunk_id)
+    new_chunks = chunks[:idx] + [c1, c2] + chunks[idx + 1:]
+    _rebuild_doc_chunks(doc_id, new_chunks)
     return {"ok": True, "data": {"chunks": [c1.chunk_id, c2.chunk_id]}}
 
 
 @router.post("/docs/{doc_id}/chunks/merge")
 def merge_chunks(doc_id: str, payload: dict):
-    """合并同文档内两个 chunk（按 order 小的在前拼接）。"""
+    """合并同文档内两个 chunk（按当前展示顺序拼接），并重建整篇文档 order。"""
     id1 = (payload.get("chunk_id1") or "").strip()
     id2 = (payload.get("chunk_id2") or "").strip()
     if not id1 or not id2 or id1 == id2:
         return {"ok": False, "error": {"code": "bad_ids", "message": "请选择两个不同的 chunk"}}
-    c1 = _find_chunk(doc_id, id1)
-    c2 = _find_chunk(doc_id, id2)
-    if c1 is None or c2 is None:
+    chunks = _load_doc_chunks(doc_id)
+    i1 = next((i for i, c in enumerate(chunks) if c.chunk_id == id1), None)
+    i2 = next((i for i, c in enumerate(chunks) if c.chunk_id == id2), None)
+    if i1 is None or i2 is None:
         return {"ok": False, "error": {"code": "not_found", "message": "chunk 不存在"}}
-    if c1.order > c2.order:
-        c1, c2 = c2, c1
+    if i1 > i2:
+        i1, i2 = i2, i1
+    c1, c2 = chunks[i1], chunks[i2]
     merged_text = (c1.text or "").rstrip() + "\n\n" + (c2.text or "").lstrip()
-    _delete_user_chunks(doc_id, [c1.chunk_id, c2.chunk_id])
-    new_chunk = _make_user_chunk(doc_id, merged_text, c1.metadata or {}, c1.heading_path, c1.order, c1.parent_chunk_id)
-    _upsert_user_chunks([new_chunk])
-    _update_chunk_count(doc_id, -1)
+    new_chunk = _make_user_chunk(doc_id, merged_text, c1.metadata or {}, c1.heading_path, i1, c1.parent_chunk_id)
+    new_chunks = chunks[:i1] + [new_chunk] + chunks[i1 + 1:i2] + chunks[i2 + 1:]
+    _rebuild_doc_chunks(doc_id, new_chunks)
     return {"ok": True, "data": {"chunk_id": new_chunk.chunk_id}}
 
 
 @router.delete("/docs/{doc_id}/chunks/{chunk_id}")
 def delete_chunk(doc_id: str, chunk_id: str):
-    """删除单个 chunk（文档至少保留 1 个 chunk）。"""
-    from online_core.retrieval_service import get_retrieval_service
-    store = get_retrieval_service()._get_store()
-    all_chunks, _ = store.scroll_paginated(
-        filter_condition={"must": [{"key": "doc_id", "match": {"value": doc_id}}]},
-        limit=500,
-    )
-    if len(all_chunks) <= 1:
+    """删除单个 chunk（文档至少保留 1 个 chunk），并重建整篇文档 order。"""
+    chunks = _load_doc_chunks(doc_id)
+    if len(chunks) <= 1:
         return {"ok": False, "error": {"code": "last_chunk", "message": "文档至少保留一个分块"}}
-    if not any(c.chunk_id == chunk_id for c in all_chunks):
+    idx = next((i for i, c in enumerate(chunks) if c.chunk_id == chunk_id), None)
+    if idx is None:
         return {"ok": False, "error": {"code": "not_found", "message": "chunk 不存在"}}
-    _delete_user_chunks(doc_id, [chunk_id])
-    _update_chunk_count(doc_id, -1)
+    new_chunks = chunks[:idx] + chunks[idx + 1:]
+    _rebuild_doc_chunks(doc_id, new_chunks)
     return {"ok": True}
 
 
