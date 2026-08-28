@@ -355,7 +355,13 @@ function SettingsPage() {
     }
     const resp = await fetch('/api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     const d = await resp.json()
-    if (d.ok) { message.success('已保存（热更新生效）') } else { message.error(d.error?.message || '保存失败') }
+    if (d.ok) {
+      message.success(`已保存，当前模型=${d.data.llm?.model}`)
+      form.setFieldsValue({
+        base_url: d.data.llm?.base_url, api_key: d.data.llm?.api_key, model: d.data.llm?.model,
+        wenshu_username: d.data.wenshu?.username || '', wenshu_password: d.data.wenshu?.password || '',
+      })
+    } else { message.error(d.error?.message || '保存失败') }
   }
 
   async function addTerm() {
