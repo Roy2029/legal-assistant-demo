@@ -131,6 +131,18 @@ TABLES: dict[str, str] = {
             trace_json TEXT,
             created_at TEXT DEFAULT (datetime('now','localtime'))
         )""",
+    "contracts": """
+        CREATE TABLE IF NOT EXISTS contracts (
+            contract_id TEXT PRIMARY KEY,
+            original_name TEXT NOT NULL,
+            file_type TEXT,
+            status TEXT DEFAULT 'uploaded',
+            redacted_path TEXT,
+            mapping_path TEXT,
+            report_path TEXT,
+            risk_count INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        )""",
     "messages": """
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

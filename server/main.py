@@ -17,6 +17,7 @@ from .session_api import router as session_router
 from .chunk_api import router as chunk_router
 from .badcase_api import router as badcase_router
 from .agent_api import router as agent_router
+from .contract_api import router as contract_router
 
 app = FastAPI(title="法律助手 Demo", version="0.1.0")
 
@@ -37,6 +38,7 @@ app.include_router(session_router)
 app.include_router(chunk_router)
 app.include_router(badcase_router)
 app.include_router(agent_router)
+app.include_router(contract_router)
 register_error_handlers(app)
 
 

@@ -1,0 +1,69 @@
+"""合同审查 API 测试：上传→列表→审查→报告→下载还原→删除。"""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from fastapi.testclient import TestClient
+from server.main import app
+
+client = TestClient(app)
+
+
+def _make_contract(path: Path):
+    import docx
+    doc = docx.Document()
+    doc.add_paragraph("甲方：张三，电话13800138000。")
+    doc.add_paragraph("合同价款为50万元，逾期按日千分之一支付违约金。")
+    doc.add_paragraph("双方约定逾期审核视为认可送审价。")
+    doc.add_paragraph("争议由守约方所在地法院管辖。")
+    doc.add_paragraph("依据民法典第585条处理。")
+    doc.save(str(path))
+
+
+def test_contract_flow(tmp_path):
+    src = tmp_path / "施工合同.docx"
+    _make_contract(src)
+
+    # 上传
+    with open(src, "rb") as f:
+        r = client.post("/api/contracts/upload", files={"files": ("施工合同.docx", f, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")})
+    assert r.status_code == 200 and r.json()["ok"], r.text
+    uploaded = r.json()["data"][0]
+    assert uploaded["ok"] is True
+    cid = uploaded["contract_id"]
+
+    # 列表
+    r = client.get("/api/contracts")
+    assert r.json()["ok"]
+    assert any(c["contract_id"] == cid for c in r.json()["data"])
+
+    # 审查
+    r = client.post(f"/api/contracts/{cid}/review")
+    assert r.status_code == 200 and r.json()["ok"], r.text
+    d = r.json()
+    assert d["risk_count"] >= 2, f"应命中至少2条内置规则，实际 {d['risk_count']}"
+
+    # 报告
+    r = client.get(f"/api/contracts/{cid}/report")
+    assert r.status_code == 200
+
+    # 下载还原版
+    r = client.get(f"/api/contracts/{cid}/download", params={"kind": "restored"})
+    assert r.status_code == 200
+    text = r.content.decode("utf-8")
+    assert "张三" in text, "还原版应包含真实姓名"
+
+    # 删除
+    r = client.delete(f"/api/contracts/{cid}")
+    assert r.json()["ok"]
+    r = client.get("/api/contracts")
+    assert not any(c["contract_id"] == cid for c in r.json()["data"])
+    print("PASS contract_flow")
+
+
+if __name__ == "__main__":
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        test_contract_flow(Path(d))
+    print("ALL CONTRACT API TESTS PASSED")

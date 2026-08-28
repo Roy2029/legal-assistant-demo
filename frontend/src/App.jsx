@@ -790,6 +790,87 @@ function KbPage() {
   )
 }
 
+function ContractPage() {
+  const [contracts, setContracts] = useState([])
+  const [uploading, setUploading] = useState(false)
+  const [uploadMsg, setUploadMsg] = useState('')
+
+  function loadContracts() {
+    fetch('/api/contracts').then((r) => r.json()).then((d) => setContracts(d.data || []))
+  }
+  useEffect(() => { loadContracts() }, [])
+
+  async function uploadFiles(fileList) {
+    const files = Array.from(fileList || [])
+    if (!files.length || uploading) return
+    setUploading(true); setUploadMsg('上传中...')
+    const fd = new FormData()
+    for (const f of files) fd.append('files', f)
+    try {
+      const r = await fetch('/api/contracts/upload', { method: 'POST', body: fd })
+      const d = await r.json()
+      if (d.ok) {
+        const ok = d.data.filter((x) => x.ok).length
+        setUploadMsg(`完成：${ok}/${d.data.length} 份上传成功`)
+        loadContracts()
+      } else { message.error(d.error?.message || '上传失败'); setUploadMsg('') }
+    } catch (e) { message.error('上传失败: ' + e.message); setUploadMsg('') } finally { setUploading(false) }
+  }
+
+  async function review(cid) {
+    const r = await fetch(`/api/contracts/${cid}/review`, { method: 'POST' })
+    const d = await r.json()
+    if (d.ok) { message.success(`审查完成：${d.risk_count} 处风险（高${d.high}/中${d.medium}/低${d.low}）`); loadContracts() } else { message.error(d.error?.message || '审查失败') }
+  }
+
+  async function remove(cid) {
+    await fetch(`/api/contracts/${cid}`, { method: 'DELETE' })
+    message.success('已删除')
+    loadContracts()
+  }
+
+  async function uploadSkill(fileList) {
+    const files = Array.from(fileList || [])
+    if (!files.length) return
+    for (const f of files) {
+      const fd = new FormData(); fd.append('file', f)
+      const r = await fetch('/api/contracts/skills', { method: 'POST', body: fd })
+      const d = await r.json()
+      if (d.ok) { message.success(`已上传规则：${d.data.filename}`) } else { message.error(d.error?.message || '规则上传失败') }
+    }
+  }
+
+  return (
+    <Card title="合同审查" size="small">
+      <Space direction="vertical" style={{ width: '100%' }}>
+        <Space wrap>
+          <Button onClick={() => document.getElementById('contract-file-input').click()} disabled={uploading}>上传合同（docx/pdf）</Button>
+          <Button onClick={() => document.getElementById('contract-skill-input').click()} disabled={uploading}>上传审查规则（.jsonl）</Button>
+          {uploadMsg && <Text type="secondary">{uploadMsg}</Text>}
+        </Space>
+        <input id="contract-file-input" type="file" accept=".docx,.pdf" multiple style={{ display: 'none' }}
+          onChange={(e) => { uploadFiles(e.target.files); e.target.value = '' }} />
+        <input id="contract-skill-input" type="file" accept=".jsonl" multiple style={{ display: 'none' }}
+          onChange={(e) => { uploadSkill(e.target.files); e.target.value = '' }} />
+        <Text type="secondary">上传后自动脱敏；审查报告为规则引擎生成，使用前须经执业律师核阅。</Text>
+        <List size="small" dataSource={contracts} renderItem={(c) => (
+          <List.Item actions={[
+            <Button key="rv" size="small" type="primary" onClick={() => review(c.contract_id)}>审查</Button>,
+            <Button key="rp" size="small" href={`/api/contracts/${c.contract_id}/report`} target="_blank" disabled={!c.report_path}>报告</Button>,
+            <Button key="dl" size="small" href={`/api/contracts/${c.contract_id}/download?kind=redacted`} target="_blank">脱敏版</Button>,
+            <Button key="rs" size="small" href={`/api/contracts/${c.contract_id}/download?kind=restored`} target="_blank">还原版</Button>,
+            <Button key="del" size="small" danger onClick={() => remove(c.contract_id)}>删除</Button>,
+          ]}>
+            <Text>{c.original_name}</Text>
+            <Tag color="blue">{c.status}</Tag>
+            <Text type="secondary">{c.risk_count} 处风险</Text>
+          </List.Item>
+        )} />
+      </Space>
+    </Card>
+  )
+}
+
 function Placeholder({ title }) {
   return <Card><Text type="secondary">{title}（开发中）</Text></Card>
 }
@@ -814,6 +895,7 @@ export default function App() {
         { key: 'chat', label: '知识库问答', children: <ChatPage /> },
         { key: 'assistant', label: '实务助手', children: <AssistantPage /> },
         { key: 'kb', label: '知识库管理', children: <KbPage /> },
+        { key: 'contract', label: '合同审查', children: <ContractPage /> },
         { key: 'settings', label: '设置', children: <SettingsPage /> },
       ]} />
     </div>
