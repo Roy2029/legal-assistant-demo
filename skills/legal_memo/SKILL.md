@@ -12,7 +12,7 @@ input_schema:
 visible_tools: [kb_retrieval, case_retrieval]
 steps:
   - id: retrieve_law
-    tool: kb_retrieval
+    tool: search_law
     params: {query: "{{input.query}}"}
   - id: retrieve_cases
     tool: case_retrieval

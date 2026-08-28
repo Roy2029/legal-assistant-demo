@@ -421,6 +421,8 @@ function AssistantPage() {
           else if (evt.type === 'step_start') setSteps((s) => [...s, { step: evt.step, status: 'running' }])
           else if (evt.type === 'tool_call') setSteps((s) => [...s, { tool: evt.tool, params: evt.params, status: 'tool' }])
           else if (evt.type === 'tool_result') setSteps((s) => [...s, { summary: evt.summary, status: 'done' }])
+          else if (evt.type === 'agent_start') setSteps((s) => [...s, { step: '知识库检索 agent', status: 'running' }])
+          else if (evt.type === 'agent_report') setSteps((s) => [...s, { step: '检索报告', summary: evt.answer || (evt.needs_human ? '需人工介入' : '已生成'), status: 'done' }])
           else if (evt.type === 'step_end') setSteps((s) => [...s, { step: evt.step + ' 完成', summary: evt.summary, status: 'done' }])
           else if (evt.type === 'final') setFinalText(evt.answer)
           else if (evt.type === 'error') setFinalText('⚠️ ' + evt.message)

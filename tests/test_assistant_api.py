@@ -16,7 +16,8 @@ def test_actions():
     print("PASS actions")
 
 def test_assistant_stream():
-    with client.stream("POST", "/api/assistant", json={"action": "case_analysis", "query": "实际施工人能否向发包人主张工程款"}) as resp:
+    # 用 contract_review（kb_retrieval 单次检索）验证流式事件；case_analysis 已切到 search_law agent，需真实 LLM，不在单测中跑
+    with client.stream("POST", "/api/assistant", json={"action": "contract_review", "query": "实际施工人能否向发包人主张工程款"}) as resp:
         assert resp.status_code == 200
         events = []
         for line in resp.iter_lines():

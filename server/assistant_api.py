@@ -59,6 +59,20 @@ def tool_kb_retrieval(query: str) -> dict:
     return {"total": len(out.results), "chunks": chunks}
 
 
+async def tool_search_law(query: str, session_id: str = "assistant") -> dict:
+    from online_core.agents.rag_agent import RAGAgent
+    agent = RAGAgent(session_id=session_id)
+    result = await agent.run(query)
+    return {
+        "total": len(result.get("citations", [])),
+        "answer": result.get("answer", ""),
+        "report": result.get("report", ""),
+        "citations": result.get("citations", []),
+        "needs_human": bool(result.get("needs_human", False)),
+        "trace": result.get("trace", {}),
+    }
+
+
 def tool_case_retrieval(query: str) -> dict:
     # M0：离线案例库未就绪，返回空态提示（不编造）
     return {"total": 0, "cases": [], "note": "案例库数据准备中，暂未接入离线案例"}
@@ -86,6 +100,14 @@ async def assistant_event_gen(action: str, query: str):
             result = tool_kb_retrieval(query)
             tool_results["kb"] = result
             yield f"data: {json.dumps({'type': 'tool_result', 'tool': tool, 'summary': '命中 ' + str(result['total']) + ' 条'}, ensure_ascii=False)}\n\n"
+
+        elif tool == "search_law":
+            yield f"data: {json.dumps({'type': 'agent_start', 'agent': 'knowledge', 'task': query}, ensure_ascii=False)}\n\n"
+            result = await tool_search_law(query, session_id=trace_id)
+            tool_results["search_law"] = result
+            yield f"data: {json.dumps({'type': 'agent_trace', 'agent': 'knowledge', 'trace': result.get('trace', {})}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'agent_report', 'agent': 'knowledge', 'answer': result.get('answer', ''), 'report': result.get('report', ''), 'citations': result.get('citations', []), 'needs_human': result.get('needs_human', False)}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'tool_result', 'tool': tool, 'summary': ('检索报告已生成' if result.get('answer') else '检索未完成') + ('（需人工介入）' if result.get('needs_human') else '')}, ensure_ascii=False)}\n\n"
 
         elif tool == "case_retrieval":
             yield f"data: {json.dumps({'type': 'tool_call', 'tool': tool, 'params': {'query': query}}, ensure_ascii=False)}\n\n"
