@@ -93,6 +93,48 @@ def _ensure_folder(conn, kb_id: str) -> None:
     )
 
 
+def _folder_exists(kb_id: str) -> bool:
+    engine = get_engine()
+    with engine.begin() as conn:
+        row = conn.execute(sa.text("SELECT 1 FROM user_kb WHERE kb_id=:k"), {"k": kb_id}).fetchone()
+    engine.dispose()
+    return row is not None
+
+
+def _set_docs_folder(doc_ids: list[str], kb_id: str) -> None:
+    """把一批文档迁移到目标文件夹：更新 Qdrant metadata 与 SQLite user_docs.kb_id。"""
+    for doc_id in doc_ids:
+        chunks = _load_doc_chunks(doc_id)
+        if not chunks:
+            continue
+        for c in chunks:
+            meta = dict(c.metadata or {})
+            meta["kb_id"] = kb_id
+            meta["folder"] = kb_id
+            c.metadata = meta
+        _rebuild_doc_chunks(doc_id, chunks)
+    engine = get_engine()
+    with engine.begin() as conn:
+        for d in doc_ids:
+            conn.execute(sa.text("UPDATE user_docs SET kb_id=:k WHERE doc_id=:d"), {"k": kb_id, "d": d})
+    engine.dispose()
+
+
+def _delete_user_doc(doc_id: str) -> None:
+    """删除单篇用户文档的 Qdrant 点、上传文件和 SQLite 记录。"""
+    from online_core.retrieval_service import get_retrieval_service
+    store = get_retrieval_service()._get_store()
+    store.delete_by_doc_id(doc_id)
+    store.save(str(Path("D:/个人/legal-assistant-demo/data/indices/法律/qdrant")))
+    engine = get_engine()
+    with engine.begin() as conn:
+        row = conn.execute(sa.text("SELECT file_path FROM user_docs WHERE doc_id=:d"), {"d": doc_id}).fetchone()
+        if row:
+            Path(row[0]).unlink(missing_ok=True)
+        conn.execute(sa.text("DELETE FROM user_docs WHERE doc_id=:d"), {"d": doc_id})
+    engine.dispose()
+
+
 @router.post("/folders")
 def create_folder(payload: dict):
     name = (payload.get("name") or "").strip()
@@ -115,15 +157,48 @@ def list_folders():
     return {"ok": True, "data": [dict(r._mapping) for r in rows]}
 
 
+@router.put("/folders/{kb_id}")
+def rename_folder(kb_id: str, payload: dict):
+    """文件夹改名：等价于创建新文件夹 → 迁移全部文档 → 删除旧文件夹。"""
+    if kb_id == DEFAULT_KB_ID:
+        return {"ok": False, "error": {"code": "default_folder", "message": "默认文件夹不能改名"}}
+    new_name = (payload.get("name") or "").strip()
+    if not new_name:
+        return {"ok": False, "error": {"code": "empty_name", "message": "文件夹名不能为空"}}
+    if new_name == kb_id:
+        return {"ok": True, "data": {"kb_id": kb_id, "name": kb_id}}
+    if _folder_exists(new_name):
+        return {"ok": False, "error": {"code": "folder_exists", "message": "目标文件夹名已存在"}}
+    engine = get_engine()
+    with engine.begin() as conn:
+        rows = conn.execute(sa.text("SELECT doc_id FROM user_docs WHERE kb_id=:k"), {"k": kb_id}).fetchall()
+    engine.dispose()
+    doc_ids = [r[0] for r in rows]
+    if doc_ids:
+        _set_docs_folder(doc_ids, new_name)
+    engine = get_engine()
+    with engine.begin() as conn:
+        conn.execute(sa.text("INSERT OR IGNORE INTO user_kb (kb_id, name) VALUES (:k, :n)"), {"k": new_name, "n": new_name})
+        conn.execute(sa.text("DELETE FROM user_kb WHERE kb_id=:old"), {"old": kb_id})
+    engine.dispose()
+    return {"ok": True, "data": {"kb_id": new_name, "name": new_name}}
+
+
 @router.delete("/folders/{kb_id}")
-def delete_folder(kb_id: str):
+def delete_folder(kb_id: str, cascade: bool = False):
     if kb_id == DEFAULT_KB_ID:
         return {"ok": False, "error": {"code": "default_folder", "message": "不能删除默认文件夹"}}
     engine = get_engine()
     with engine.begin() as conn:
-        cnt = conn.execute(sa.text("SELECT COUNT(*) FROM user_docs WHERE kb_id=:k"), {"k": kb_id}).scalar()
-        if cnt and cnt > 0:
-            return {"ok": False, "error": {"code": "folder_not_empty", "message": "请先删除文件夹内的文档"}}
+        rows = conn.execute(sa.text("SELECT doc_id FROM user_docs WHERE kb_id=:k"), {"k": kb_id}).fetchall()
+    engine.dispose()
+    doc_ids = [r[0] for r in rows]
+    if doc_ids and not cascade:
+        return {"ok": False, "error": {"code": "folder_not_empty", "message": "文件夹内还有文档，请先移走或使用 cascade=true 级联删除"}}
+    for doc_id in doc_ids:
+        _delete_user_doc(doc_id)
+    engine = get_engine()
+    with engine.begin() as conn:
         conn.execute(sa.text("DELETE FROM user_kb WHERE kb_id=:k"), {"k": kb_id})
     engine.dispose()
     return {"ok": True}
@@ -204,6 +279,39 @@ def list_docs(folder: str | None = None):
         return {"ok": True, "data": [dict(r._mapping) for r in rows]}
     except Exception as e:
         return {"ok": False, "error": {"code": "db_error", "message": str(e)}}
+
+
+@router.put("/docs/{doc_id}/folder")
+def move_doc_to_folder(doc_id: str, payload: dict):
+    """把单篇文档移动到指定文件夹。"""
+    kb_id = (payload.get("kb_id") or "").strip()
+    if not kb_id:
+        return {"ok": False, "error": {"code": "empty_folder", "message": "文件夹不能为空"}}
+    if not _folder_exists(kb_id):
+        return {"ok": False, "error": {"code": "folder_not_found", "message": "文件夹不存在，请先创建"}}
+    engine = get_engine()
+    with engine.begin() as conn:
+        row = conn.execute(sa.text("SELECT 1 FROM user_docs WHERE doc_id=:d"), {"d": doc_id}).fetchone()
+    engine.dispose()
+    if not row:
+        return {"ok": False, "error": {"code": "not_found", "message": "文档不存在"}}
+    _set_docs_folder([doc_id], kb_id)
+    return {"ok": True}
+
+
+@router.post("/docs/move")
+def move_docs_to_folder(payload: dict):
+    """批量把文档移动到指定文件夹。"""
+    doc_ids = payload.get("doc_ids") or []
+    kb_id = (payload.get("kb_id") or "").strip()
+    if not doc_ids:
+        return {"ok": False, "error": {"code": "empty_docs", "message": "请选择文档"}}
+    if not kb_id:
+        return {"ok": False, "error": {"code": "empty_folder", "message": "文件夹不能为空"}}
+    if not _folder_exists(kb_id):
+        return {"ok": False, "error": {"code": "folder_not_found", "message": "文件夹不存在，请先创建"}}
+    _set_docs_folder([str(d) for d in doc_ids], kb_id)
+    return {"ok": True, "data": {"moved": len(doc_ids)}}
 
 
 @router.get("/docs/{doc_id}/chunks")
@@ -385,19 +493,5 @@ def delete_chunk(doc_id: str, chunk_id: str):
 
 @router.delete("/docs/{doc_id}")
 def delete_doc(doc_id: str):
-    from online_core.retrieval_service import get_retrieval_service
-    svc = get_retrieval_service()
-    store = svc._get_store()
-    store.delete_by_doc_id(doc_id)
-    store.save(str(Path("D:/个人/legal-assistant-demo/data/indices/法律/qdrant")))
-    try:
-        engine = get_engine()
-        with engine.begin() as conn:
-            row = conn.execute(sa.text("SELECT file_path FROM user_docs WHERE doc_id=:d"), {"d": doc_id}).fetchone()
-            if row:
-                Path(row[0]).unlink(missing_ok=True)
-            conn.execute(sa.text("DELETE FROM user_docs WHERE doc_id=:d"), {"d": doc_id})
-        engine.dispose()
-    except Exception:
-        pass
+    _delete_user_doc(doc_id)
     return {"ok": True}

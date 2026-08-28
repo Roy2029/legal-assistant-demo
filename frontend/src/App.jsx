@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Button, Card, Collapse, Form, Input, List, Modal, Select, Space, Tabs, Tag, Typography, message } from 'antd'
+import { Button, Card, Checkbox, Collapse, Form, Input, List, Modal, Select, Space, Tabs, Tag, Typography, message } from 'antd'
 import { SendOutlined, StopOutlined } from '@ant-design/icons'
 
 const { Text, Paragraph } = Typography
@@ -483,6 +483,10 @@ function KbPage() {
   const [splitPart1, setSplitPart1] = useState('')
   const [splitPart2, setSplitPart2] = useState('')
   const [chunkBusy, setChunkBusy] = useState(false)
+  const [selectedIds, setSelectedIds] = useState([])
+  const [batchMoveFolder, setBatchMoveFolder] = useState(undefined)
+  const [renamingFolder, setRenamingFolder] = useState(null)
+  const [renameText, setRenameText] = useState('')
 
   async function viewChunks(docId) {
     const r = await fetch('/api/kb/docs/' + encodeURIComponent(docId) + '/chunks')
@@ -591,6 +595,46 @@ function KbPage() {
     if (d.ok) { message.success(`已创建文件夹：${name}`); setNewFolder(''); setFolder(name); loadFolders() } else { message.error(d.error?.message || '创建失败') }
   }
 
+  async function saveRenameFolder() {
+    const name = (renameText || '').trim()
+    if (!renamingFolder || !name) return
+    const r = await fetch('/api/kb/folders/' + encodeURIComponent(renamingFolder.kb_id), {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
+    })
+    const d = await r.json()
+    if (d.ok) { message.success(`已改名为：${name}`); setRenamingFolder(null); setFolder(name); setFilterFolder(undefined); loadFolders(); loadDocs() } else { message.error(d.error?.message || '改名失败') }
+  }
+
+  async function deleteFolder(f) {
+    Modal.confirm({
+      title: `删除文件夹「${f.name}」`,
+      content: '文件夹内的文档将一并删除，且不可恢复。确认删除？',
+      okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
+      onOk: async () => {
+        const r = await fetch('/api/kb/folders/' + encodeURIComponent(f.kb_id) + '?cascade=true', { method: 'DELETE' })
+        const d = await r.json()
+        if (d.ok) { message.success('已删除文件夹'); setFolder('default'); setFilterFolder(undefined); loadFolders(); loadDocs() } else { message.error(d.error?.message || '删除失败') }
+      },
+    })
+  }
+
+  async function moveDoc(docId, targetFolder) {
+    const r = await fetch('/api/kb/docs/' + encodeURIComponent(docId) + '/folder', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kb_id: targetFolder }),
+    })
+    const d = await r.json()
+    if (d.ok) { message.success('已移动文档'); loadDocs(); loadFolders() } else { message.error(d.error?.message || '移动失败') }
+  }
+
+  async function moveSelectedDocs() {
+    if (!selectedIds.length || !batchMoveFolder) return
+    const r = await fetch('/api/kb/docs/move', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ doc_ids: selectedIds, kb_id: batchMoveFolder }),
+    })
+    const d = await r.json()
+    if (d.ok) { message.success(`已移动 ${d.data.moved} 篇文档`); setSelectedIds([]); setBatchMoveFolder(undefined); loadDocs(); loadFolders() } else { message.error(d.error?.message || '移动失败') }
+  }
+
   async function uploadOne(file) {
     const fd = new FormData()
     fd.append('file', file)
@@ -624,11 +668,24 @@ function KbPage() {
     <Card title="知识库管理" size="small">
       <Space direction="vertical" style={{ width: '100%' }}>
         <Space wrap>
-          <Text strong>上传到文件夹：</Text>
+          <Text strong>当前文件夹：</Text>
           <Select size="small" style={{ width: 180 }} value={folder} onChange={setFolder}
             options={folders.map((f) => ({ value: f.kb_id, label: f.name }))} />
+          <Button size="small" disabled={folder === 'default'} onClick={() => { setRenamingFolder(folders.find((f) => f.kb_id === folder)); setRenameText(folder) }}>改名</Button>
+          <Button size="small" danger disabled={folder === 'default'} onClick={() => deleteFolder(folders.find((f) => f.kb_id === folder))}>删除</Button>
+        </Space>
+        <Space wrap>
+          <Text strong>新建文件夹：</Text>
           <Input size="small" style={{ width: 160 }} placeholder="新文件夹名" value={newFolder} onChange={(e) => setNewFolder(e.target.value)} onPressEnter={createFolder} />
-          <Button size="small" onClick={createFolder}>新建文件夹</Button>
+          <Button size="small" onClick={createFolder}>新建</Button>
+        </Space>
+        <Space wrap>
+          <Text strong>批量移动：</Text>
+          <Checkbox checked={docs.length > 0 && selectedIds.length === docs.length} onChange={(e) => setSelectedIds(e.target.checked ? docs.map((d) => d.doc_id) : [])}>全选</Checkbox>
+          <Text type="secondary">已选 {selectedIds.length} 篇</Text>
+          <Select size="small" style={{ width: 160 }} placeholder="目标文件夹" value={batchMoveFolder} onChange={setBatchMoveFolder}
+            options={folders.map((f) => ({ value: f.kb_id, label: f.name }))} />
+          <Button size="small" disabled={!selectedIds.length || !batchMoveFolder} onClick={moveSelectedDocs}>移动选中</Button>
         </Space>
         <Space wrap>
           <Button onClick={() => document.getElementById('kb-file-input').click()} disabled={uploading}>选择多个文件</Button>
@@ -647,13 +704,23 @@ function KbPage() {
             options={folders.map((f) => ({ value: f.kb_id, label: f.name }))} />
         </Space>
         <List size="small" dataSource={docs} renderItem={(d) => (
-          <List.Item actions={[<Button size="small" onClick={() => viewChunks(d.doc_id)}>查看分块</Button>, <Button size="small" danger onClick={() => remove(d.doc_id)}>删除</Button>]}>
+          <List.Item actions={[
+            <Select key="mv" size="small" style={{ width: 130 }} value={d.kb_id || 'default'}
+              onChange={(v) => moveDoc(d.doc_id, v)}
+              options={folders.map((f) => ({ value: f.kb_id, label: f.name }))} />,
+            <Button key="ch" size="small" onClick={() => viewChunks(d.doc_id)}>查看分块</Button>,
+            <Button key="del" size="small" danger onClick={() => remove(d.doc_id)}>删除</Button>,
+          ]}>
+            <Checkbox checked={selectedIds.includes(d.doc_id)} onChange={(e) => setSelectedIds((prev) => e.target.checked ? [...prev, d.doc_id] : prev.filter((x) => x !== d.doc_id))} />
             <Text>{d.file_path?.replace(/.*[\/]/, '')}</Text>
             <Tag color="blue">{d.kb_id || 'default'}</Tag>
             <Tag>{d.parse_status}</Tag>
             <Text type="secondary">{d.chunk_count} chunks</Text>
           </List.Item>
         )} />
+        <Modal open={!!renamingFolder} onCancel={() => setRenamingFolder(null)} onOk={saveRenameFolder} okText="保存" cancelText="取消" title={`文件夹改名（${renamingFolder?.name || ''}）`}>
+          <Input value={renameText} onChange={(e) => setRenameText(e.target.value)} placeholder="新文件夹名" />
+        </Modal>
         <Modal open={!!chunkViewDoc} onCancel={() => setChunkViewDoc(null)} footer={null} title={`分块查看与调整（${chunkViewDoc || ''}）`} width={860}>
           <div style={{ maxHeight: 480, overflow: 'auto' }}>
             {chunks.length === 0 && <Text type="secondary">（无分块）</Text>}

@@ -126,7 +126,61 @@ def test_chunk_manage():
         TEST_MD.unlink(missing_ok=True)
 
 
+def test_folder_rename_move_batch():
+    TEST_MD.write_text(
+        """# 测试公司考勤管理办法
+
+第一条 为规范公司考勤管理，制定本办法。
+第二条 连续旷工三日的，公司可以解除劳动合同。
+""",
+        encoding="utf-8",
+    )
+    try:
+        # 建两个文件夹
+        r = client.post("/api/kb/folders", json={"name": "test-folder-a"})
+        assert r.json()["ok"]
+        r = client.post("/api/kb/folders", json={"name": "test-folder-b"})
+        assert r.json()["ok"]
+
+        # 上传到 a
+        with open(TEST_MD, "rb") as f:
+            r = client.post("/api/kb/upload", files={"file": ("test_upload_folder.md", f, "text/markdown")}, data={"kb_id": "test-folder-a"})
+        assert r.status_code == 200 and r.json()["ok"], r.text
+        doc_id = r.json()["data"]["doc_id"]
+
+        # 单篇移动到 b
+        r = client.put(f"/api/kb/docs/{doc_id}/folder", json={"kb_id": "test-folder-b"})
+        assert r.status_code == 200 and r.json()["ok"], r.text
+        r = client.get("/api/kb/docs", params={"folder": "test-folder-b"})
+        assert any(d["doc_id"] == doc_id for d in r.json()["data"])
+
+        # 批量移动到 a
+        r = client.post("/api/kb/docs/move", json={"doc_ids": [doc_id], "kb_id": "test-folder-a"})
+        assert r.status_code == 200 and r.json()["ok"], r.text
+        r = client.get("/api/kb/docs", params={"folder": "test-folder-a"})
+        assert any(d["doc_id"] == doc_id for d in r.json()["data"])
+
+        # 文件夹 a 改名 c
+        r = client.put("/api/kb/folders/test-folder-a", json={"name": "test-folder-c"})
+        assert r.status_code == 200 and r.json()["ok"], r.text
+        r = client.get("/api/kb/folders")
+        ids = [f["kb_id"] for f in r.json()["data"]]
+        assert "test-folder-c" in ids and "test-folder-a" not in ids
+        r = client.get("/api/kb/docs", params={"folder": "test-folder-c"})
+        assert any(d["doc_id"] == doc_id for d in r.json()["data"])
+
+        # 清理：级联删除 c，删除 b
+        r = client.delete("/api/kb/folders/test-folder-c?cascade=true")
+        assert r.json()["ok"]
+        r = client.delete("/api/kb/folders/test-folder-b")
+        assert r.json()["ok"]
+        print("PASS folder_rename_move_batch")
+    finally:
+        TEST_MD.unlink(missing_ok=True)
+
+
 if __name__ == "__main__":
     test_folder_upload_filter_chunks()
     test_chunk_manage()
+    test_folder_rename_move_batch()
     print("ALL KB FOLDER TESTS PASSED")
