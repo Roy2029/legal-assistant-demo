@@ -1,6 +1,7 @@
 """实务助手 API（W5 M0 桩）：skill 注册表 + 按 steps 调度工具。"""
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 from pathlib import Path
@@ -73,9 +74,19 @@ async def tool_search_law(query: str, session_id: str = "assistant") -> dict:
     }
 
 
-def tool_case_retrieval(query: str) -> dict:
-    # M0：离线案例库未就绪，返回空态提示（不编造）
-    return {"total": 0, "cases": [], "note": "案例库数据准备中，暂未接入离线案例"}
+async def tool_case_retrieval(query: str) -> dict:
+    """类案检索：优先走裁判文书 MCP，不可用时降级为空态提示。"""
+    from online_core.agents.case_agent import CaseAgent
+    try:
+        agent = CaseAgent(session_id="assistant-case")
+        result = await asyncio.wait_for(agent.search(fulltext_keyword=query, page_num=1, page_size=10), timeout=30)
+        if result.get("ok"):
+            return {"total": result.get("total", 0), "cases": result.get("documents", []), "note": "来自裁判文书检索 MCP"}
+        return {"total": 0, "cases": [], "note": f"MCP 检索失败：{result.get('error', '未知错误')}"}
+    except asyncio.TimeoutError:
+        return {"total": 0, "cases": [], "note": "裁判文书检索超时（30s），请稍后重试"}
+    except Exception as e:
+        return {"total": 0, "cases": [], "note": f"裁判文书检索不可用：{e}"}
 
 
 def analyze_step(query: str, tool_results: dict) -> str:
@@ -111,7 +122,7 @@ async def assistant_event_gen(action: str, query: str):
 
         elif tool == "case_retrieval":
             yield f"data: {json.dumps({'type': 'tool_call', 'tool': tool, 'params': {'query': query}}, ensure_ascii=False)}\n\n"
-            result = tool_case_retrieval(query)
+            result = await tool_case_retrieval(query)
             tool_results["case"] = result
             yield f"data: {json.dumps({'type': 'tool_result', 'tool': tool, 'summary': result.get('note', '0 条')}, ensure_ascii=False)}\n\n"
         else:

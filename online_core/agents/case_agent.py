@@ -1,23 +1,21 @@
-"""类案检索 agent（D09 §9 v1）：MCP 接入 + 渐进式读取。
-
-v1 先提供可直接调用的工具方法；ReAct 循环待 BaseReActAgent 抽出后复用。
-"""
+"""类案检索 agent（D09 §9）：ReAct 子代理，接裁判文书检索 MCP。"""
 from __future__ import annotations
 
-import json
-from typing import Any, Optional
+import asyncio
+from typing import Optional
 
+from online_core.agents.base import BaseReActAgent
 from online_core.mcp.wenshu_adapter import WenshuMCPAdapter
 
 
-class CaseAgent:
-    """类案检索 agent 工具集。"""
+class CaseAgent(BaseReActAgent):
+    """类案检索 agent：case_search / case_read / case_search_by_law / case_guided。"""
 
-    def __init__(self, adapter: Optional[WenshuMCPAdapter] = None):
+    def __init__(self, adapter: Optional[WenshuMCPAdapter] = None, llm=None, session_id: str = "default", **kwargs):
+        super().__init__(llm=llm, session_id=session_id, **kwargs)
         self.adapter = adapter or WenshuMCPAdapter()
 
-    @staticmethod
-    def tools() -> list[dict]:
+    def tools(self) -> list[dict]:
         return [
             {
                 "type": "function",
@@ -67,8 +65,66 @@ class CaseAgent:
                     "parameters": {"type": "object", "properties": {"keyword": {"type": "string"}}, "required": ["keyword"]},
                 },
             },
+            {
+                "type": "function",
+                "function": {
+                    "name": "write_file",
+                    "description": "将中间结果写入工作目录内的 .md/.json 文件。",
+                    "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]},
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "finish",
+                    "description": "提交类案检索报告并结束。",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "report": {"type": "string", "description": "完整类案检索报告"},
+                            "answer": {"type": "string", "description": "对用户问题的简洁回答"},
+                            "citations": {"type": "array", "items": {"type": "object", "properties": {"case_number": {"type": "string"}, "case_name": {"type": "string"}}}},
+                            "needs_human": {"type": "boolean", "default": False},
+                        },
+                        "required": ["report", "answer"],
+                    },
+                },
+            },
         ]
 
+    def build_system(self, query: str, **kwargs) -> str:
+        return (
+            "你是类案检索 agent。通过裁判文书检索 MCP 查找案例，只能依据工具返回内容作答，不得编造案例。\n"
+            "检索原则：\n"
+            "1) 先 case_search 查元数据（只返回总数+前若干条摘要，不读全文）；\n"
+            "2) 总数 > 200 时，先收窄条件（案由/法院/日期/关键词）再查；\n"
+            "3) 只对最相关的 case_read 读全文，每轮最多读 5 篇；\n"
+            "4) 遇到限流/验证码错误时，停止重试并 finish(needs_human=true)；\n"
+            "5) 最后用 finish 提交报告。"
+        )
+
+    async def execute_tool(self, name: str, args: dict) -> dict:
+        timeout = 90 if name in ("case_search", "case_read", "case_search_by_law", "case_guided") else 15
+        try:
+            if name == "case_search":
+                return await asyncio.wait_for(self.search(**args), timeout)
+            if name == "case_read":
+                return await asyncio.wait_for(self.read(args.get("case_number", "")), timeout)
+            if name == "case_search_by_law":
+                return await asyncio.wait_for(self.search_by_law(args.get("legal_basis", "")), timeout)
+            if name == "case_guided":
+                return await asyncio.wait_for(self.guided(args.get("keyword", "")), timeout)
+            if name == "write_file":
+                return await asyncio.wait_for(asyncio.to_thread(self._write_file, args.get("path", ""), args.get("content", "")), timeout)
+            if name == "finish":
+                return {"ok": True, **args}
+            return {"ok": False, "error": f"未知工具 {name}"}
+        except asyncio.TimeoutError:
+            return {"ok": False, "error": f"工具超时（>{timeout}s）"}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    # ── 直接调用方法（供非 ReAct 场景使用） ─────────────────────
     async def search(self, **kwargs) -> dict:
         return await self.adapter.call_tool("search_judgments_tool", kwargs)
 
@@ -80,21 +136,3 @@ class CaseAgent:
 
     async def guided(self, keyword: str) -> dict:
         return await self.adapter.call_tool("search_guided_cases_tool", {"keyword": keyword})
-
-    async def run(self, query: str) -> dict:
-        """v1 规则式流程：搜索 → 如结果过多则提示缩小范围 → 读取前 3 篇。"""
-        r = await self.search(fulltext_keyword=query, page_num=1, page_size=15)
-        if not r.get("ok"):
-            return {"ok": False, "error": r.get("error"), "query": query}
-        result_text = r.get("result", "")
-        try:
-            result_data = json.loads(result_text)
-        except Exception:
-            result_data = {"raw": result_text[:2000]}
-        return {
-            "ok": True,
-            "query": query,
-            "total": result_data.get("total", 0) if isinstance(result_data, dict) else None,
-            "documents": (result_data.get("documents", []) if isinstance(result_data, dict) else [])[:15],
-            "note": "如需查看具体文书，请调用 case_read(case_number)。",
-        }
