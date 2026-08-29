@@ -282,7 +282,12 @@ export default function LawAssistantPage() {
 
   async function runAgent(q, mk) {
     const url = mk === 'case_analysis' ? '/api/assistant' : (mk === 'rag' ? '/api/rag-agent' : '/api/case-agent')
-    const body = mk === 'case_analysis' ? { action: 'case_analysis', query: q, session_id: sessionId } : { query: q, session_id: sessionId }
+    const folders = folderFilter.length ? folderFilter : undefined
+    const body = mk === 'case_analysis'
+      ? { action: 'case_analysis', query: q, session_id: sessionId, folders }
+      : mk === 'rag'
+        ? { query: q, session_id: sessionId, folders }
+        : { query: q, session_id: sessionId }
     updateLastAssistant('执行中…', true)
     let finalText = ''
     try {
@@ -458,7 +463,7 @@ export default function LawAssistantPage() {
         )}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
           <Select size="small" mode="multiple" allowClear style={{ minWidth: 240, flex: 1 }} placeholder="全部知识库（公共+本人）" value={folderFilter} onChange={setFolderFilter}
-            options={[{ value: '__public__', label: '公共法律库' }, ...folderOptions]} disabled={modeKey !== 'chat'} />
+            options={[{ value: '__public__', label: '公共法律库' }, ...folderOptions]} disabled={modeKey === 'case'} />
           <Text type="secondary" style={{ fontSize: 12 }}>会话请从左侧列表选择</Text>
         </div>
         <div style={{ display: 'flex', gap: 8, paddingTop: 8 }}>

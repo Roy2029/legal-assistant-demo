@@ -61,10 +61,10 @@ def tool_kb_retrieval(query: str) -> dict:
     return {"total": len(out.results), "chunks": chunks}
 
 
-async def tool_search_law(query: str, session_id: str = "assistant") -> dict:
+async def tool_search_law(query: str, session_id: str = "assistant", folders: list | None = None) -> dict:
     from online_core.agents.rag_agent import RAGAgent
     agent = RAGAgent(session_id=session_id)
-    result = await agent.run(query)
+    result = await agent.run(query, folders=folders)
     return {
         "total": len(result.get("citations", [])),
         "answer": result.get("answer", ""),
@@ -96,7 +96,7 @@ def analyze_step(query: str, tool_results: dict) -> str:
     return f"[M0 桩] 已基于检索资料生成初步分析框架（工具结果 {json.dumps(tool_results, ensure_ascii=False)[:300]}）。"
 
 
-async def assistant_event_gen(action: str, query: str, session_id: str | None = None):
+async def assistant_event_gen(action: str, query: str, session_id: str | None = None, folders: list | None = None):
     skill = get_skill(action)
     trace_id = uuid.uuid4().hex
     if skill is None:
@@ -125,7 +125,7 @@ async def assistant_event_gen(action: str, query: str, session_id: str | None = 
             async def cb(evt):
                 await q.put(evt)
 
-            task = asyncio.create_task(agent.run(query, event_cb=cb))
+            task = asyncio.create_task(agent.run(query, folders=folders, event_cb=cb))
             while not task.done() or not q.empty():
                 try:
                     evt = await asyncio.wait_for(q.get(), timeout=0.2)
@@ -173,4 +173,7 @@ async def assistant(payload: dict):
     if not query:
         return {"ok": False, "error": {"code": "empty_query", "message": "query 不能为空"}}
     session_id = payload.get("session_id")
-    return StreamingResponse(assistant_event_gen(action, query, session_id), media_type="text/event-stream")
+    folders = payload.get("folders")
+    if isinstance(folders, str):
+        folders = [folders]
+    return StreamingResponse(assistant_event_gen(action, query, session_id, folders), media_type="text/event-stream")
