@@ -1,10 +1,15 @@
 """会话与消息持久化辅助（供 chat/assistant/agent API 共用）。"""
 from __future__ import annotations
 
+import json
 import uuid
+from pathlib import Path
 
 from .db import get_engine
 import sqlalchemy as sa
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+TRACE_DIR = PROJECT_ROOT / "data" / "logs" / "traces"
 
 
 def ensure_session(session_id: str | None, mode: str = "chat", action: str = "", title: str = "新会话") -> str:
@@ -35,17 +40,20 @@ def append_message(session_id: str, role: str, content: str, msg_kind: str = "fi
 
 
 def save_session_trace(session_id: str, trace_type: str, trace: dict) -> None:
-    """保存一次会话的 trace（retrieval/agent/assistant）。每个类型保留最新一条。"""
+    """保存一次会话的 trace（retrieval/agent/assistant）。
+
+    - 数据库 session_traces 表保留最新一条（供会话历史回看）；
+    - 同时自动落一份 JSON 文件到 data/logs/traces/（供离线分析）。
+    """
     if not session_id or not trace:
         return
-    import json
+    data = json.dumps(trace, ensure_ascii=False)[:200000]
     engine = get_engine()
     with engine.begin() as conn:
         row = conn.execute(
             sa.text("SELECT id FROM session_traces WHERE session_id=:s AND trace_type=:t"),
             {"s": session_id, "t": trace_type},
         ).fetchone()
-        data = json.dumps(trace, ensure_ascii=False)[:200000]
         if row:
             conn.execute(
                 sa.text("UPDATE session_traces SET trace_json=:j, created_at=datetime('now','localtime') WHERE id=:i"),
@@ -57,6 +65,19 @@ def save_session_trace(session_id: str, trace_type: str, trace: dict) -> None:
                 {"s": session_id, "t": trace_type, "j": data},
             )
     engine.dispose()
+
+    # 自动持久化 JSON 文件（同一会话+类型覆盖为最新）
+    try:
+        TRACE_DIR.mkdir(parents=True, exist_ok=True)
+        safe_type = trace_type.replace("/", "_").replace("\\", "_")
+        safe_sid = session_id[:12]
+        file_path = TRACE_DIR / f"{safe_sid}_{safe_type}_trace.json"
+        file_path.write_text(
+            json.dumps({"session_id": session_id, "trace_type": trace_type, "trace": trace}, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
 
 
 def load_session_traces(session_id: str) -> dict:
