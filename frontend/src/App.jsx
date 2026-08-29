@@ -4,6 +4,8 @@ import remarkGfm from 'remark-gfm'
 import { Button, Card, Checkbox, Collapse, Form, Input, List, Modal, Select, Space, Tabs, Tag, Typography, message } from 'antd'
 import { SendOutlined, StopOutlined } from '@ant-design/icons'
 import ContractPage from './ContractPage.jsx'
+import LawAssistantPage from './LawAssistantPage.jsx'
+import KbManagePage from './KbManagePage.jsx'
 
 const { Text, Paragraph } = Typography
 
@@ -910,11 +912,10 @@ export default function App() {
         .md-body blockquote { border-left: 3px solid #d9d9d9; margin: 8px 0; padding-left: 12px; color: #666; }
       `}</style>
       <Typography.Title level={3} style={{ marginBottom: 16 }}>法律助手 Demo</Typography.Title>
-      <Tabs defaultActiveKey="chat" items={[
-        { key: 'chat', label: '知识库问答', children: <ChatPage /> },
-        { key: 'assistant', label: '实务助手', children: <AssistantPage /> },
-        { key: 'kb', label: '知识库管理', children: <KbPage /> },
+      <Tabs defaultActiveKey="assistant" items={[
+        { key: 'assistant', label: '法律助手', children: <LawAssistantPage /> },
         { key: 'contract', label: '合同审查', children: <ContractPage /> },
+        { key: 'kb', label: '知识库管理', children: <KbManagePage /> },
         { key: 'settings', label: '设置', children: <SettingsPage /> },
       ]} />
     </div>
