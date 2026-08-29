@@ -91,9 +91,11 @@ async def tool_case_retrieval(query: str) -> dict:
 
 
 def analyze_step(query: str, tool_results: dict) -> str:
+    """M0 简化分析步骤：不调用 LLM，只汇总工具结果。最终回答以 search_law 结果为准。"""
+    total = sum(len(v.get('chunks', [])) for v in tool_results.values())
     if not llm_client.configured:
-        return f"[M0 桩] 已检索到 {sum(len(v.get('chunks', [])) for v in tool_results.values())} 条法规/案例线索。深度分析在 M1 建设。"
-    return f"[M0 桩] 已基于检索资料生成初步分析框架（工具结果 {json.dumps(tool_results, ensure_ascii=False)[:300]}）。"
+        return f"分析步骤（简化版）：已检索到 {total} 条法规/案例线索，未配置 LLM，不生成深度分析。"
+    return f"分析步骤（简化版）：已基于检索资料汇总 {total} 条线索，最终回答见会话输出。"
 
 
 async def assistant_event_gen(action: str, query: str, session_id: str | None = None, folders: list | None = None):
