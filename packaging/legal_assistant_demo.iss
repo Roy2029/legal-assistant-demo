@@ -26,9 +26,6 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
 
-[Languages]
-Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
-
 [Files]
 ; 后端与核心代码（运行时必需）
 Source: "..\server\*"; DestDir: "{app}\server"; Flags: recursesubdirs createallsubdirs
