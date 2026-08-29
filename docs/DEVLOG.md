@@ -20,6 +20,15 @@
 
 ## 踩坑记录
 
+8. **antd Radio/Checkbox.Group options 必须用 `{value,label}`**：写成 `{key,label}` 后 option.value 全是 undefined，antd 内部对 option 值 `toString()` 抛 `Cannot read properties of undefined`，React 渲染崩溃 → 整个 tab 白屏；同时控制台报同一 key 警告。排查方法：Playwright 打开页面点对应 tab，捕获 `pageerror` 事件。
+9. **`npm run build` 通过 ≠ 页面能渲染**：vite build 只做语法/打包检查，`setRuleUploading` 未定义这类 ReferenceError 只在函数调用时才触发，渲染期错误更是必须用浏览器/Playwright 实测。凡新页面都要用 Playwright 点一遍 tab、点主要按钮、看 `pageerror`。
+10. **bash heredoc 长命令会被截断**（约 8-9KB）：大文件写入时分段 `cat >>` 追加；写入 Python 源码文件时，Python 字符串里的 `
+` 容易在 heredoc/JSON 转义链路中被解释成真实换行，破坏生成代码。生成含换行字符串的代码时用 `chr(10)` 代替 `
+`。
+11. **合同还原版必须放在 agent 工作区之外**：还原产物若写入 `data/agent_workspace/contract-{cid}/`，ReAct agent 可通过 read_contract 读到还原后的原始信息，等于绕过脱敏。还原版目录应为 `data/contracts/restored/`。
+12. **删除单个合同的状态文件不能 `rmtree(parent)`**：`mask_state_path(cid).parent` 是整个 `mask_state` 目录，rmtree 会误删所有合同的状态；应只 `unlink` 单个 cid 的状态文件。
+13. **ReAct 合同审查 agent 必须用事件回调流式输出**：无 event_cb 时页面只显示 loading，用户以为卡死；BaseReActAgent 已支持 event_cb，assistant/contract-chat 均通过 asyncio.Queue 转发 SSE。
+
 7. **reranker 在 GTX 1650 上的三重坑**：① `.half()` FP16 转换后 predict 极慢（580s/批）；② FP32 模型 2166MB + 系统占用导致 4GB 显存实际可用仅 ~1.2GB，GPU 放不下；③ CPU rerank 长文本 30 对远超短文本 benchmark。M0 关闭 rerank，M2 再优化（量化/候选裁剪/换机）。
 
 1. **transformers 5.x 与 sentence-transformers 5.5 不兼容** → 降级 transformers<5；demo 用 .venv 隔离。
@@ -102,3 +111,10 @@
 - 前端新增「合同审查」tab
 - 测试：65 passed
 - 待办：LLM 审查工作流、完整 SKILL.md 用户 skill、修订版合同、在线编辑、扫描 PDF OCR
+
+
+## 合同审查 D11（2026-08-29，AFK 自动开发）
+- 完成：可配置脱敏（人名/企业名/信用代码/电话/邮箱/身份证号 × 中间打码/占位符/哈希）、扫描清单、脱密映射配置与按选中配置还原、拖选原文片段加入清单、新版三栏 UI（左文档列表可收起 / 中预览+版本切换 / 右脱敏+审查+文档产物 tab）、上传文件/文件夹、重命名/删除、规则库 txt/md/jsonl 多选上传、ReAct 合同审查 agent chat（自动附带当前脱敏文件与规则库引用，生成批注 edit 版 + Markdown 报告 + 批注 DOCX）
+- 测试：68 passed（新增 test_configurable_mask_flow）
+- 白屏修复：Radio/Checkbox options 的 value 缺失导致 antd toString 崩溃，已用 Playwright 回归验证 0 pageerror
+- 待办：扫描 PDF OCR、人名/企业名识别改用 NER 或引入法学专名库、批注版在线编辑、律师朋友验收内置规则
