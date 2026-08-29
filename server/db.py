@@ -154,6 +154,14 @@ TABLES: dict[str, str] = {
             token_count INTEGER,
             created_at TEXT DEFAULT (datetime('now','localtime'))
         )""",
+    "session_traces": """
+        CREATE TABLE IF NOT EXISTS session_traces (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            trace_type TEXT NOT NULL,
+            trace_json TEXT,
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        )""",
 }
 
 def init_db() -> None:

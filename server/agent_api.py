@@ -43,6 +43,11 @@ async def _run_rag_agent(query: str, session_id: str, folders: Optional[list[str
         yield _sse({"type": "error", "code": "rag_agent_failed", "message": str(e)})
         yield _sse({"type": "done"})
         return
+    try:
+        from .session_utils import save_session_trace
+        save_session_trace(session_id, "agent", result.get("trace", {}))
+    except Exception:
+        pass
     yield _sse({"type": "agent_trace", "agent": "knowledge", "trace": result.get("trace", {})})
     yield _sse({
         "type": "agent_report",
@@ -86,6 +91,11 @@ async def _run_case_agent(query: str, session_id: str):
         yield _sse({"type": "error", "code": "case_agent_failed", "message": str(e)})
         yield _sse({"type": "done"})
         return
+    try:
+        from .session_utils import save_session_trace
+        save_session_trace(session_id, "agent", result.get("trace", {}))
+    except Exception:
+        pass
     yield _sse({"type": "agent_trace", "agent": "case", "trace": result.get("trace", {})})
     yield _sse({
         "type": "agent_report",

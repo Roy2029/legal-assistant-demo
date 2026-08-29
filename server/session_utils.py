@@ -32,3 +32,47 @@ def append_message(session_id: str, role: str, content: str, msg_kind: str = "fi
             {"s": session_id, "r": role, "k": msg_kind, "c": content[:20000]},
         )
     engine.dispose()
+
+
+def save_session_trace(session_id: str, trace_type: str, trace: dict) -> None:
+    """保存一次会话的 trace（retrieval/agent/assistant）。每个类型保留最新一条。"""
+    if not session_id or not trace:
+        return
+    import json
+    engine = get_engine()
+    with engine.begin() as conn:
+        row = conn.execute(
+            sa.text("SELECT id FROM session_traces WHERE session_id=:s AND trace_type=:t"),
+            {"s": session_id, "t": trace_type},
+        ).fetchone()
+        data = json.dumps(trace, ensure_ascii=False)[:200000]
+        if row:
+            conn.execute(
+                sa.text("UPDATE session_traces SET trace_json=:j, created_at=datetime('now','localtime') WHERE id=:i"),
+                {"j": data, "i": row[0]},
+            )
+        else:
+            conn.execute(
+                sa.text("INSERT INTO session_traces (session_id, trace_type, trace_json) VALUES (:s, :t, :j)"),
+                {"s": session_id, "t": trace_type, "j": data},
+            )
+    engine.dispose()
+
+
+def load_session_traces(session_id: str) -> dict:
+    """读取会话的全部 trace，按 trace_type 返回 dict。"""
+    import json
+    engine = get_engine()
+    with engine.begin() as conn:
+        rows = conn.execute(
+            sa.text("SELECT trace_type, trace_json FROM session_traces WHERE session_id=:s ORDER BY id ASC"),
+            {"s": session_id},
+        ).fetchall()
+    engine.dispose()
+    out = {}
+    for t, j in rows:
+        try:
+            out[t] = json.loads(j)
+        except Exception:
+            out[t] = {}
+    return out

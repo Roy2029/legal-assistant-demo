@@ -6,6 +6,7 @@ import uuid
 from fastapi import APIRouter
 
 from .db import get_engine
+from .session_utils import load_session_traces, save_session_trace
 import sqlalchemy as sa
 
 router = APIRouter(prefix="/api/sessions")
@@ -81,3 +82,18 @@ def get_messages(session_id: str):
         ).fetchall()
     engine.dispose()
     return {"ok": True, "data": [dict(r._mapping) for r in rows]}
+
+
+@router.get("/{session_id}/traces")
+def get_traces(session_id: str):
+    return {"ok": True, "data": load_session_traces(session_id)}
+
+
+@router.post("/{session_id}/traces")
+def save_trace(session_id: str, payload: dict):
+    trace_type = (payload.get("trace_type") or "").strip()
+    trace = payload.get("trace")
+    if not trace_type or not isinstance(trace, dict):
+        return {"ok": False, "error": {"code": "bad_trace", "message": "trace_type 与 trace 对象不能为空"}}
+    save_session_trace(session_id, trace_type, trace)
+    return {"ok": True, "data": {"session_id": session_id, "trace_type": trace_type}}

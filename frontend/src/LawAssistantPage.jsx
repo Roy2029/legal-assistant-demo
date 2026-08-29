@@ -120,6 +120,7 @@ export default function LawAssistantPage() {
   const [citations, setCitations] = useState([])
   const [agentSteps, setAgentSteps] = useState([])
   const [finalReport, setFinalReport] = useState('')
+  const [agentTraceFull, setAgentTraceFull] = useState(null)
   const [traceId, setTraceId] = useState(null)
   const [lastQuery, setLastQuery] = useState('')
   const [lastAnswer, setLastAnswer] = useState('')
@@ -152,6 +153,7 @@ export default function LawAssistantPage() {
     setTrace(null)
     setCitations([])
     setAgentSteps([])
+    setAgentTraceFull(null)
     setFinalReport('')
     await loadSessions()
   }
@@ -171,6 +173,7 @@ export default function LawAssistantPage() {
       setSessionId(cur.session_id)
       setModeKey(modeKeyOf(cur))
       loadMessages(cur.session_id)
+      loadTraces(cur.session_id)
     } else {
       setModeKey(modeKeyOf(cur))
     }
@@ -180,6 +183,38 @@ export default function LawAssistantPage() {
     const r = await fetch('/api/sessions/' + sid + '/messages')
     const d = await r.json()
     if (d.ok) setMessages((d.data || []).map((m) => ({ role: m.role, content: m.content })))
+  }
+
+  function applyAgentTrace(traceObj) {
+    if (!traceObj) { setAgentSteps([]); setAgentTraceFull(null); return }
+    setAgentTraceFull(traceObj)
+    const steps = []
+    const rounds = traceObj.rounds || []
+    for (const r of rounds) {
+      if (r.think_present) steps.push({ step: '第' + r.iteration + '轮推理', summary: '模型已输出推理内容', status: 'done' })
+      for (const tc of (r.tool_calls || [])) {
+        steps.push({
+          step: '工具 ' + tc.tool,
+          summary: (tc.ok ? '成功' : '失败') + ' · ' + ((tc.summary || '') + '').slice(0, 200),
+          status: tc.ok ? 'done' : 'tool',
+        })
+      }
+    }
+    for (const e of (traceObj.errors || [])) steps.push({ step: '异常', summary: e.error || e.type || JSON.stringify(e).slice(0, 120), status: 'running' })
+    setAgentSteps(steps)
+  }
+
+  async function loadTraces(sid) {
+    try {
+      const r = await fetch('/api/sessions/' + sid + '/traces')
+      const d = await r.json()
+      if (d.ok) {
+        const t = d.data || {}
+        if (t.retrieval) setTrace(t.retrieval)
+        if (t.agent) applyAgentTrace(t.agent)
+        else if (!t.agent) { setAgentTraceFull(null); setAgentSteps([]) }
+      }
+    } catch (e) { /* ignore */ }
   }
 
   async function newSession() {
@@ -395,6 +430,13 @@ export default function LawAssistantPage() {
           <Markdown content={finalReport} style={{ fontSize: 12 }} />
         </Card>
       )}
+      {agentTraceFull && (
+        <Collapse
+          size="small"
+          style={{ marginTop: 8 }}
+          items={[{ key: 'raw', label: '原始 trace JSON', children: <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 11, maxHeight: 300, overflow: 'auto' }}>{JSON.stringify(agentTraceFull, null, 2)}</pre> }]}
+        />
+      )}
     </div>
   )
 
@@ -415,7 +457,7 @@ export default function LawAssistantPage() {
           renderItem={(s) => (
             <List.Item
               style={{ cursor: 'pointer', background: s.session_id === sessionId ? '#e6f4ff' : undefined, padding: '6px 8px', borderRadius: 6, marginBottom: 2 }}
-              onClick={() => { setSessionId(s.session_id); setModeKey(modeKeyOf(s)); setMessages([]); loadMessages(s.session_id); setTrace(null); setCitations([]); setAgentSteps([]); setFinalReport('') }}
+              onClick={() => { setSessionId(s.session_id); setModeKey(modeKeyOf(s)); setMessages([]); loadMessages(s.session_id); setTrace(null); setCitations([]); setAgentSteps([]); setAgentTraceFull(null); setFinalReport(''); loadTraces(s.session_id) }}
               actions={[
                 <Button key="rn" size="small" type="text" icon={<EditOutlined />} onClick={(e) => { e.stopPropagation(); setRenameText(s.title || ''); setRenameOpen(true) }} />,
                 <Button key="dl" size="small" type="text" danger icon={<DeleteOutlined />} onClick={(e) => { e.stopPropagation(); if (s.session_id === sessionId) deleteSession(); else { fetch('/api/sessions/' + s.session_id, { method: 'DELETE' }).then(loadSessions) } }} />,
