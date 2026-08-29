@@ -16,8 +16,11 @@ from online_core.query_parser import parse_query
 from online_core.difficulty import estimate
 from online_core.lexicon_service import apply_user_lexicon
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 RAG1_ROOT = Path("D:/个人/Research/RAG1.0")
-DEFAULT_EMBEDDING = str(RAG1_ROOT / "local_model/bge-base-zh")
+# 打包后模型位于 {安装目录}/models/bge-base-zh；开发机回退到 RAG1 原路径
+_PORTABLE_EMBEDDING = PROJECT_ROOT / "models" / "bge-base-zh"
+DEFAULT_EMBEDDING = str(_PORTABLE_EMBEDDING if _PORTABLE_EMBEDDING.exists() else RAG1_ROOT / "local_model/bge-base-zh")
 DEFAULT_RERANKER = str(RAG1_ROOT / "local_model/bge-reranker-v2-m3")
 
 

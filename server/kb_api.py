@@ -6,6 +6,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, UploadFile
+from fastapi.responses import JSONResponse
 
 from .db import get_engine
 import sqlalchemy as sa
@@ -209,6 +210,13 @@ def rebuild_kb():
     """手动重建法律库索引：释放 Qdrant 锁后启动后台重建脚本。"""
     import subprocess
     import sys as _sys
+
+    intermediate = PROJECT_ROOT / "data" / "indices" / "法律" / "chunk_v2_intermediate" / "chunks.jsonl"
+    if not intermediate.exists():
+        return JSONResponse(
+            {"ok": False, "error": {"code": "no_intermediate", "message": "安装包未包含重建索引中间产物，无法重建；请重新安装完整包或联系管理员。"}},
+            status_code=400,
+        )
 
     from online_core.retrieval_service import get_retrieval_service
     svc = get_retrieval_service()

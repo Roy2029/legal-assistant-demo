@@ -19,6 +19,17 @@
 
 前端开发服务器：http://127.0.0.1:5173 ｜ 后端 API：http://127.0.0.1:8000
 
+## 安装包用户（Inno Setup 打包版）
+
+安装包不包含 Python 运行时和依赖 wheelhouse，请先自行安装 Python 3.12（安装时勾选 **Add Python to PATH**）。
+
+1. 安装 Python 3.12 后，进入安装目录，双击 **`install_deps.bat`**（自动创建 `.venv` 并从 PyPI 安装依赖）；
+2. 双击 **`start_legal_assistant.bat`** 启动，浏览器自动打开 http://127.0.0.1:8000 ；
+3. 首次启动会自动创建 `data/sqlite.db` 与运行目录，并加载本地法律库索引（约需 20-60 秒）；
+4. 在「设置」页填写 LLM API Key / Base URL / Model（或安装前在安装目录配置 `.env`）。
+
+> 打包版不含「重建法律库」中间产物，重建按钮会提示不可用；如需该功能请使用开发版或重新构建索引。
+
 ## 功能清单（M0 代码开发已关闭）
 
 - **知识库问答**：精确法条号检索（如"民法典第32条"）、语义混合检索（dense+BM25）、引用校验（防法条幻觉）、PreFilter 保守拦截、Trace 面板（dense/BM25 召回 chunk + BM25 分词）、引用卡片点击定位原文

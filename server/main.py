@@ -49,11 +49,12 @@ def on_startup():
     # 避免首次提问才加载模型（迭代需求 #2），也避免各模块各自 new QdrantClient
     # 触发本地嵌入式 Qdrant 的 AlreadyLocked（迭代需求 #3）。
     try:
-        from online_core.retrieval_service import RetrievalConfig, configure_retrieval
+        from online_core.retrieval_service import RetrievalConfig, configure_retrieval, DEFAULT_EMBEDDING
+        PROJECT_ROOT = Path(__file__).resolve().parents[1]
         rc = config_service.load().get("retrieval", {})
         config = RetrievalConfig(
-            index_path=str(Path("D:/个人/legal-assistant-demo/data/indices/法律/qdrant")),
-            embedding_model=rc.get("embedding_model") or "D:/个人/Research/RAG1.0/local_model/bge-base-zh",
+            index_path=str(PROJECT_ROOT / "data" / "indices" / "法律" / "qdrant"),
+            embedding_model=rc.get("embedding_model") or DEFAULT_EMBEDDING,
             embedding_device=rc.get("embedding_device") or "cpu",
             reranker_model=rc.get("reranker_model") or "D:/个人/Research/RAG1.0/local_model/bge-reranker-v2-m3",
             reranker_provider=rc.get("reranker_provider") or "skip",
@@ -90,6 +91,14 @@ def get_config():
 def put_config(payload: dict):
     config_service.update(payload)
     return {"ok": True, "data": config_service.load()}
+
+
+# ── 生产打包：由 FastAPI 统一服务前端 dist（安装包不依赖 node/vite）──
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
+if FRONTEND_DIST.exists():
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="frontend")
 
 
 if __name__ == "__main__":
