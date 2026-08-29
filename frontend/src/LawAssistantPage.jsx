@@ -91,9 +91,9 @@ function Feedback({ mode, action, sessionId, traceId, query, answer, trace }) {
 
 const MODE_OPTIONS = [
   { value: 'chat', label: '知识库问答' },
-  { value: 'case_analysis', label: '主agent' },
-  { value: 'rag', label: 'RAG agent' },
-  { value: 'case', label: 'case agent' },
+  { value: 'case_analysis', label: '智能分析' },
+  { value: 'rag', label: '知识库助手' },
+  { value: 'case', label: '类案助手' },
 ]
 
 function modeKeyOf(s) {
@@ -106,7 +106,7 @@ function modeKeyOf(s) {
 
 function modeLabelOf(s) {
   const found = MODE_OPTIONS.find((m) => m.value === modeKeyOf(s))
-  return found ? found.label : '主agent'
+  return found ? found.label : '智能分析'
 }
 
 export default function LawAssistantPage() {
@@ -307,7 +307,7 @@ export default function LawAssistantPage() {
             else if (evt.type === 'step_start') setAgentSteps((s) => [...s, { step: evt.step, status: 'running' }])
             else if (evt.type === 'tool_call') setAgentSteps((s) => [...s, { tool: evt.tool, params: evt.params, status: 'tool' }])
             else if (evt.type === 'tool_result') setAgentSteps((s) => [...s, { summary: evt.summary, status: 'done' }])
-            else if (evt.type === 'agent_start') setAgentSteps((s) => [...s, { step: (evt.agent === 'knowledge' ? '知识库检索 agent' : evt.agent === 'case' ? '类案检索 agent' : evt.agent) + ' 启动', status: 'running' }])
+            else if (evt.type === 'agent_start') setAgentSteps((s) => [...s, { step: (evt.agent === 'knowledge' ? '知识库助手' : evt.agent === 'case' ? '类案助手' : evt.agent) + ' 启动', status: 'running' }])
             else if (evt.type === 'agent_think') setAgentSteps((s) => [...s, { step: '推理', summary: (evt.text || '').slice(0, 120), status: 'done' }])
             else if (evt.type === 'agent_tool_call') setAgentSteps((s) => [...s, { tool: evt.tool, params: evt.params, status: 'tool' }])
             else if (evt.type === 'agent_tool_result') setAgentSteps((s) => [...s, { summary: (evt.summary || '').slice(0, 160), status: 'done' }])
@@ -370,14 +370,17 @@ export default function LawAssistantPage() {
 
   const agentTraceView = (
     <div>
-      {!agentSteps.length && <Text type="secondary">主agent / RAG agent / case agent 执行后展示思考与工具 trace</Text>}
+      {!agentSteps.length && <Text type="secondary">智能分析 / 知识库助手 / 类案助手 执行后展示思考与工具 trace</Text>}
       {agentSteps.length > 0 && (
         <List
           size="small"
           dataSource={agentSteps}
           renderItem={(s, i) => (
-            <List.Item key={i}>
-              <Tag color={s.status === 'done' ? 'green' : 'blue'}>{(s.step || s.tool || '') + (s.summary ? '：' + s.summary : '')}</Tag>
+            <List.Item key={i} style={{ display: 'block' }}>
+              <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12, lineHeight: 1.6 }}>
+                <Tag color={s.status === 'done' ? 'green' : 'blue'} style={{ marginRight: 6 }}>{s.status === 'done' ? '完成' : '进行中'}</Tag>
+                <Text style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12 }}>{(s.step || s.tool || '') + (s.summary ? '：' + s.summary : '')}</Text>
+              </div>
             </List.Item>
           )}
         />
@@ -454,10 +457,9 @@ export default function LawAssistantPage() {
           </div>
         )}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
-          <Select size="small" style={{ width: 200 }} value={sessionId} onChange={(v) => { setSessionId(v); setMessages([]); loadMessages(v); const s = sessions.find((x) => x.session_id === v); if (s) setModeKey(modeKeyOf(s)) }}
-            options={sessions.map((s) => ({ value: s.session_id, label: (s.title || s.session_id.slice(0, 8)) + ' · ' + modeLabelOf(s) }))} />
-          <Select size="small" mode="multiple" allowClear style={{ minWidth: 220, flex: 1 }} placeholder="全部知识库（公共+本人）" value={folderFilter} onChange={setFolderFilter}
+          <Select size="small" mode="multiple" allowClear style={{ minWidth: 240, flex: 1 }} placeholder="全部知识库（公共+本人）" value={folderFilter} onChange={setFolderFilter}
             options={[{ value: '__public__', label: '公共法律库' }, ...folderOptions]} disabled={modeKey !== 'chat'} />
+          <Text type="secondary" style={{ fontSize: 12 }}>会话请从左侧列表选择</Text>
         </div>
         <div style={{ display: 'flex', gap: 8, paddingTop: 8 }}>
           <Input.TextArea value={input} onChange={(e) => setInput(e.target.value)} onPressEnter={(e) => { e.preventDefault(); send() }} placeholder={modeKey === 'chat' ? '输入法律问题，如：民法典第580条说了什么' : '输入法律问题或案情要点'} autoSize={{ minRows: 2, maxRows: 6 }} disabled={running} />
@@ -475,7 +477,7 @@ export default function LawAssistantPage() {
             buttonStyle="solid"
             options={MODE_OPTIONS}
           />
-          <Text type="secondary" style={{ fontSize: 12 }}>切换模式将开启新会话（默认主agent）</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>切换模式将开启新会话（默认智能分析）</Text>
         </div>
       </Card>
 

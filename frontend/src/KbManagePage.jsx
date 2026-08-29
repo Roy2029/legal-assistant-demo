@@ -7,7 +7,7 @@ import { DeleteOutlined, EditOutlined, FolderOpenOutlined, UploadOutlined } from
 const { Text } = Typography
 
 function displayFileName(filePath) {
-  const name = (filePath || '').split(/[\/]/).pop() || ''
+  const name = (filePath || '').split(/[\\/]/).pop() || ''
   return name.replace(/^[0-9a-f]{32}__/, '')
 }
 
@@ -15,7 +15,6 @@ export default function KbManagePage() {
   const [docs, setDocs] = useState([])
   const [folders, setFolders] = useState([])
   const [folder, setFolder] = useState('default')
-  const [filterFolder, setFilterFolder] = useState(undefined)
   const [newFolder, setNewFolder] = useState('')
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState('')
@@ -34,14 +33,14 @@ export default function KbManagePage() {
   const [renamingFolder, setRenamingFolder] = useState(null)
   const [renameText, setRenameText] = useState('')
   const [dragDocId, setDragDocId] = useState(null)
+  const [expandedFolders, setExpandedFolders] = useState({})
   const fileInputRef = useRef(null)
   const folderInputRef = useRef(null)
 
   useEffect(() => { loadDocs(); loadFolders() }, [])
-  useEffect(() => { loadDocs() }, [filterFolder])
 
   function loadDocs() {
-    const url = filterFolder ? '/api/kb/docs?folder=' + encodeURIComponent(filterFolder) : '/api/kb/docs'
+    const url = '/api/kb/docs'
     fetch(url).then((r) => r.json()).then((d) => setDocs(d.data || []))
   }
   function loadFolders() {
@@ -49,6 +48,12 @@ export default function KbManagePage() {
       const fs = d.data || []
       setFolders(fs)
       if (!fs.find((f) => f.kb_id === folder)) setFolder('default')
+      setExpandedFolders((prev) => {
+        const next = { ...prev }
+        for (const f of fs) if (next[f.kb_id] === undefined) next[f.kb_id] = true
+        if (next['default'] === undefined) next['default'] = true
+        return next
+      })
     })
   }
 
@@ -175,7 +180,7 @@ export default function KbManagePage() {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
     })
     const d = await r.json()
-    if (d.ok) { message.success(`已改名为：${name}`); setRenamingFolder(null); setFolder(name); setFilterFolder(undefined); loadFolders(); loadDocs() } else { message.error(d.error?.message || '改名失败') }
+    if (d.ok) { message.success(`已改名为：${name}`); setRenamingFolder(null); setFolder(name); loadFolders(); loadDocs() } else { message.error(d.error?.message || '改名失败') }
   }
 
   async function deleteFolder(f) {
@@ -186,7 +191,7 @@ export default function KbManagePage() {
       onOk: async () => {
         const r = await fetch('/api/kb/folders/' + encodeURIComponent(f.kb_id) + '?cascade=true', { method: 'DELETE' })
         const d = await r.json()
-        if (d.ok) { message.success('已删除文件夹'); setFolder('default'); setFilterFolder(undefined); loadFolders(); loadDocs() } else { message.error(d.error?.message || '删除失败') }
+        if (d.ok) { message.success('已删除文件夹'); setFolder('default'); loadFolders(); loadDocs() } else { message.error(d.error?.message || '删除失败') }
       },
     })
   }
@@ -265,67 +270,64 @@ export default function KbManagePage() {
           </Space>
           {rebuildMsg && <Text type="secondary" style={{ fontSize: 12 }}>{rebuildMsg}</Text>}
           {uploading && <Tag color="blue">{uploadProgress}</Tag>}
-          <Space wrap>
-            <Text strong>文件夹</Text>
-            <Select size="small" allowClear style={{ width: 150 }} placeholder="按文件夹筛选" value={filterFolder} onChange={setFilterFolder}
-              options={folders.map((f) => ({ value: f.kb_id, label: f.name }))} />
-            <Select size="small" style={{ width: 140 }} value={folder} onChange={setFolder} options={folders.map((f) => ({ value: f.kb_id, label: f.name }))} />
-          </Space>
-          {folders.map((f) => (
-            <div
-              key={f.kb_id}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => dropOnFolder(f.kb_id)}
-              style={{ border: dragDocId ? '1px dashed #1677ff' : '1px solid #f0f0f0', borderRadius: 6, padding: '6px 8px', background: dragDocId ? '#f0f5ff' : '#fafafa', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-            >
-              <Space size={4}>
-                <FolderOpenOutlined style={{ color: '#faad14' }} />
-                <Text strong style={{ fontSize: 13 }}>{f.name}</Text>
-                <Tag>{docsInFolder(f.kb_id).length} 篇</Tag>
-              </Space>
-              <Space size={4}>
-                <Button size="small" type="text" icon={<EditOutlined />} onClick={() => { setRenamingFolder(f); setRenameText(f.name) }} />
-                <Button size="small" type="text" danger icon={<DeleteOutlined />} disabled={f.kb_id === 'default'} onClick={() => deleteFolder(f)} />
-              </Space>
-            </div>
-          ))}
+          <Text type="secondary" style={{ fontSize: 12 }}>点击文件夹展开/收起文件列表；上传目标：当前选中文件夹「{folder}」</Text>
+          {folders.map((f) => {
+            const expanded = expandedFolders[f.kb_id] !== false
+            const folderDocs = docsInFolder(f.kb_id)
+            return (
+              <div key={f.kb_id}>
+                <div
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => dropOnFolder(f.kb_id)}
+                  onClick={() => { setExpandedFolders((prev) => ({ ...prev, [f.kb_id]: !expanded })); setFolder(f.kb_id) }}
+                  style={{ border: dragDocId ? '1px dashed #1677ff' : '1px solid #f0f0f0', borderRadius: 6, padding: '6px 8px', background: dragDocId ? '#f0f5ff' : folder === f.kb_id ? '#fff7e6' : '#fafafa', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: 2 }}
+                >
+                  <Space size={4}>
+                    <span style={{ color: '#999', fontSize: 12 }}>{expanded ? '▾' : '▸'}</span>
+                    <FolderOpenOutlined style={{ color: '#faad14' }} />
+                    <Text strong style={{ fontSize: 13 }}>{f.name}</Text>
+                    <Tag>{folderDocs.length} 篇</Tag>
+                  </Space>
+                  <Space size={4} onClick={(e) => e.stopPropagation()}>
+                    <Button size="small" type="text" icon={<EditOutlined />} onClick={() => { setRenamingFolder(f); setRenameText(f.name) }} />
+                    <Button size="small" type="text" danger icon={<DeleteOutlined />} disabled={f.kb_id === 'default'} onClick={() => deleteFolder(f)} />
+                  </Space>
+                </div>
+                {expanded && (
+                  <div style={{ marginLeft: 18, borderLeft: '1px dashed #d9d9d9', paddingLeft: 8 }}>
+                    {folderDocs.length === 0 && <Text type="secondary" style={{ fontSize: 12 }}>（空）</Text>}
+                    {folderDocs.map((d) => (
+                      <div key={d.doc_id}
+                        draggable
+                        onDragStart={() => setDragDocId(d.doc_id)}
+                        onDragEnd={() => setDragDocId(null)}
+                        onClick={() => viewChunks(d.doc_id)}
+                        style={{ cursor: 'grab', background: d.doc_id === selectedDocId ? '#e6f4ff' : undefined, padding: '4px 8px', borderRadius: 6, marginBottom: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                      >
+                        <Space size={4}>
+                          <Checkbox checked={selectedIds.includes(d.doc_id)} onClick={(e) => e.stopPropagation()} onChange={(e) => setSelectedIds((prev) => e.target.checked ? [...prev, d.doc_id] : prev.filter((x) => x !== d.doc_id))} />
+                          <Text style={{ fontSize: 13, wordBreak: 'break-all' }}>{displayFileName(d.file_path)}</Text>
+                        </Space>
+                        <Space size={4}>
+                          <Tag>{d.parse_status}</Tag>
+                          <Text type="secondary" style={{ fontSize: 12 }}>{d.chunk_count} chunks</Text>
+                          <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={(e) => { e.stopPropagation(); removeDoc(d.doc_id) }} />
+                        </Space>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text strong>文档</Text>
+            <Text strong>批量操作</Text>
             <Space size={4}>
               <Checkbox checked={docs.length > 0 && selectedIds.length === docs.length} onChange={(e) => setSelectedIds(e.target.checked ? docs.map((d) => d.doc_id) : [])}>全选</Checkbox>
               <Select size="small" style={{ width: 130 }} placeholder="移动到文件夹" value={batchMoveFolder} onChange={setBatchMoveFolder} options={folders.map((f) => ({ value: f.kb_id, label: f.name }))} />
               <Button size="small" disabled={!selectedIds.length || !batchMoveFolder} onClick={moveSelectedDocs}>移动选中</Button>
             </Space>
           </div>
-          <List
-            size="small"
-            dataSource={docs}
-            locale={{ emptyText: '暂无文档' }}
-            renderItem={(d) => (
-              <List.Item
-                draggable
-                onDragStart={() => setDragDocId(d.doc_id)}
-                onDragEnd={() => setDragDocId(null)}
-                style={{ cursor: 'grab', background: d.doc_id === selectedDocId ? '#e6f4ff' : undefined, padding: '4px 8px', borderRadius: 6, marginBottom: 2 }}
-                onClick={() => viewChunks(d.doc_id)}
-                actions={[
-                  <Button key="del" size="small" type="text" danger icon={<DeleteOutlined />} onClick={(e) => { e.stopPropagation(); removeDoc(d.doc_id) }} />,
-                ]}
-              >
-                <Space direction="vertical" size={0} style={{ width: '100%' }}>
-                  <Space size={4}>
-                    <Checkbox checked={selectedIds.includes(d.doc_id)} onClick={(e) => e.stopPropagation()} onChange={(e) => setSelectedIds((prev) => e.target.checked ? [...prev, d.doc_id] : prev.filter((x) => x !== d.doc_id))} />
-                    <Text style={{ fontSize: 13, wordBreak: 'break-all' }}>{displayFileName(d.file_path)}</Text>
-                  </Space>
-                  <Space size={4}>
-                    <Tag color="blue">{d.kb_id || 'default'}</Tag>
-                    <Tag>{d.parse_status}</Tag>
-                    <Text type="secondary" style={{ fontSize: 12 }}>{d.chunk_count} chunks</Text>
-                  </Space>
-                </Space>
-              </List.Item>
-            )}
-          />
         </Space>
       </Card>
 
