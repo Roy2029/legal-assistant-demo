@@ -125,3 +125,63 @@ def render_report(file_names: list[str], risks: list[dict]) -> str:
         report += "\n"
     report += "---\n本报告由规则引擎生成，仅供参考，使用前须经执业律师核阅。\n"
     return report
+
+
+# ---------------------------------------------------------------------------
+# D11：可配置脱敏后的批注版生成（Markdown + DOCX）
+# ---------------------------------------------------------------------------
+
+def annotate_text_markdown(text: str, risks: list) -> str:
+    """在脱敏文本上按风险清单插入批注，返回 Markdown。"""
+    lines = text.splitlines() or [text]
+    out_lines = []
+    for line in lines:
+        out_lines.append(line)
+        matched = [r for r in risks if r.get("snippet") and r["snippet"][:20] in line]
+        if not matched:
+            matched = [r for r in risks if r.get("clause") and r["clause"][:20] in line]
+        if matched:
+            for r in matched:
+                tip = "[{level}] {desc} → {sugg}".format(
+                    level=r.get("risk_level", "medium"),
+                    desc=r.get("risk_desc", ""),
+                    sugg=r.get("suggestion", "") or r.get("suggestion_template", ""),
+                )
+                out_lines.append("> **风险提示** " + tip)
+    return chr(10).join(out_lines)
+
+
+def annotate_text_docx(text: str, risks: list, output_path) -> int:
+    """把脱敏文本 + 风险清单生成批注版 DOCX（黄色高亮 + 红字风险提示）。"""
+    import docx
+    from docx.enum.text import WD_COLOR_INDEX
+    from docx.shared import RGBColor
+
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    doc = docx.Document()
+    notes = 0
+    for line in (text.splitlines() or [text]):
+        para = doc.add_paragraph(line)
+        matched = [r for r in risks if r.get("snippet") and r["snippet"][:20] in line]
+        if not matched:
+            matched = [r for r in risks if r.get("clause") and r["clause"][:20] in line]
+        if matched:
+            for run in para.runs:
+                try:
+                    run.font.highlight_color = WD_COLOR_INDEX.YELLOW
+                except Exception:
+                    pass
+            for r in matched:
+                tip = "[{level}] {desc} → {sugg}".format(
+                    level=r.get("risk_level", "medium"),
+                    desc=r.get("risk_desc", ""),
+                    sugg=r.get("suggestion", "") or r.get("suggestion_template", ""),
+                )
+                note = doc.add_paragraph()
+                run = note.add_run("【风险提示】" + tip)
+                run.font.color.rgb = RGBColor(0xC0, 0x00, 0x00)
+                run.font.bold = True
+                notes += 1
+    doc.save(str(output_path))
+    return notes

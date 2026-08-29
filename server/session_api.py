@@ -25,13 +25,19 @@ def create_session(payload: dict | None = None):
 
 
 @router.get("")
-def list_sessions(mode: str | None = None):
+def list_sessions(mode: str | None = None, action: str | None = None):
     engine = get_engine()
     sql = "SELECT session_id, mode, action, title, created_at FROM sessions"
     params = {}
+    conds = []
     if mode:
-        sql += " WHERE mode=:m"
+        conds.append("mode=:m")
         params["m"] = mode
+    if action:
+        conds.append("action=:a")
+        params["a"] = action
+    if conds:
+        sql += " WHERE " + " AND ".join(conds)
     sql += " ORDER BY created_at DESC"
     with engine.begin() as conn:
         rows = conn.execute(sa.text(sql), params).fetchall()

@@ -104,3 +104,63 @@ if __name__ == "__main__":
     with tempfile.TemporaryDirectory() as d:
         test_contract_flow(Path(d))
     print("ALL CONTRACT API TESTS PASSED")
+
+
+def test_configurable_mask_flow(tmp_path):
+    import docx as dx
+    src = tmp_path / "可配置脱敏测试.docx"
+    doc = dx.Document()
+    doc.add_paragraph("甲方：张三，电话13800138000，邮箱 zhangsan@example.com，身份证号110101199001011234。")
+    doc.add_paragraph("乙方：华为技术有限公司，统一社会信用代码91110108MA01ABCD1X。")
+    doc.add_paragraph("合同价款为50万元，逾期按日千分之一支付违约金。")
+    doc.save(str(src))
+
+    with open(src, "rb") as f:
+        r = client.post("/api/contracts/upload", files={"files": ("可配置脱敏测试.docx", f, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")})
+    assert r.status_code == 200 and r.json()["ok"], r.text
+    cid = r.json()["data"][0]["contract_id"]
+
+    # 版本列表应包含原版与初始脱敏版
+    r = client.get(f"/api/contracts/{cid}/versions")
+    assert r.status_code == 200 and r.json()["ok"]
+    kinds = [v["kind"] for v in r.json()["data"]]
+    assert "original" in kinds and "redacted" in kinds
+
+    # 扫描应命中六类敏感信息
+    r = client.get(f"/api/contracts/{cid}/scan")
+    assert r.status_code == 200 and r.json()["ok"]
+    items = r.json()["data"]["items"]
+    cats = {i["category"] for i in items}
+    assert {"person_name", "company_name", "credit_code", "phone", "email", "id_card"} <= cats
+
+    # 按扫描清单确认脱敏（占位符）
+    r = client.post(f"/api/contracts/{cid}/mask", json={"categories": ["person_name", "company_name", "credit_code", "phone", "email", "id_card"], "method": "placeholder", "items": items})
+    assert r.status_code == 200 and r.json()["ok"], r.text
+    md = r.json()["data"]
+    assert md["masked_count"] == len(items)
+    assert "张三" not in md["content"] and "华为技术有限公司" not in md["content"]
+
+    # 映射配置可还原
+    r = client.get(f"/api/contracts/{cid}/mask/mapping")
+    assert r.json()["ok"]
+    entries = r.json()["data"]["entries"]
+    assert len(entries) == len(items)
+    r = client.post(f"/api/contracts/{cid}/mask/restore", json={"file": md["file"], "entries": entries})
+    assert r.status_code == 200 and r.json()["ok"]
+    assert "张三" in r.json()["data"]["content"]
+    assert "13800138000" in r.json()["data"]["content"]
+
+    # 拖选手动片段加入清单
+    r = client.post(f"/api/contracts/{cid}/mask/manual", json={"text": "特殊敏感句", "category": "manual"})
+    assert r.status_code == 200 and r.json()["ok"]
+    r = client.get(f"/api/contracts/{cid}/mask/manual")
+    assert len(r.json()["data"]) >= 1
+
+    # 重命名
+    r = client.put(f"/api/contracts/{cid}", json={"original_name": "重命名合同.docx"})
+    assert r.status_code == 200 and r.json()["ok"]
+
+    # 删除
+    r = client.delete(f"/api/contracts/{cid}")
+    assert r.json()["ok"]
+    print("PASS configurable_mask_flow")

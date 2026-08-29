@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Button, Card, Checkbox, Collapse, Form, Input, List, Modal, Select, Space, Tabs, Tag, Typography, message } from 'antd'
 import { SendOutlined, StopOutlined } from '@ant-design/icons'
+import ContractPage from './ContractPage.jsx'
 
 const { Text, Paragraph } = Typography
 
@@ -467,13 +468,13 @@ function AssistantPage() {
     { key: 'case_analysis', name: '案件分析', desc: '主 agent：按 skill 步骤调度工具', status: '可用' },
     { key: 'rag', name: '知识库检索', desc: 'RAG agent：ReAct 多跳检索法律依据', status: '可用' },
     { key: 'case', name: '类案检索', desc: 'Case agent：裁判文书 MCP 类案检索', status: '可用' },
-    { key: 'contract_review', name: '合同审查', desc: '合同审查 agent（待开发）', status: '待开发' },
+    { key: 'contract_review', name: '合同审查', desc: '请在「合同审查」主 tab 使用', status: '独立页面' },
   ]
 
   async function run() {
     const q = input.trim()
     if (!q || running) return
-    if (mode === 'contract_review') { message.info('合同审查 agent 待开发，敬请期待'); return }
+    if (mode === 'contract_review') { message.info('合同审查已迁移至「合同审查」主 tab，请前往使用'); return }
     setSteps([]); setFinalText(''); setFinalReport(''); setRunning(true)
     const url = mode === 'case_analysis' ? '/api/assistant' : (mode === 'rag' ? '/api/rag-agent' : '/api/case-agent')
     const body = mode === 'case_analysis' ? { action: 'case_analysis', query: q, session_id: sessionId } : { query: q, session_id: sessionId }
@@ -882,133 +883,6 @@ function KbPage() {
             <Input.TextArea value={splitPart1} onChange={(e) => setSplitPart1(e.target.value)} autoSize={{ minRows: 4, maxRows: 12 }} />
             <Text strong>第 2 段：</Text>
             <Input.TextArea value={splitPart2} onChange={(e) => setSplitPart2(e.target.value)} autoSize={{ minRows: 4, maxRows: 12 }} />
-          </Space>
-        </Modal>
-      </Space>
-    </Card>
-  )
-}
-
-function ContractPage() {
-  const [contracts, setContracts] = useState([])
-  const [uploading, setUploading] = useState(false)
-  const [uploadMsg, setUploadMsg] = useState('')
-  const [editingContract, setEditingContract] = useState(null)
-  const [editFiles, setEditFiles] = useState([])
-  const [editFile, setEditFile] = useState(undefined)
-  const [editContent, setEditContent] = useState('')
-  const [editSaving, setEditSaving] = useState(false)
-
-  function loadContracts() {
-    fetch('/api/contracts').then((r) => r.json()).then((d) => setContracts(d.data || []))
-  }
-
-  async function openEditor(c) {
-    setEditingContract(c); setEditContent(''); setEditFile(undefined); setEditFiles([])
-    try {
-      const r = await fetch(`/api/contracts/${c.contract_id}/files`)
-      const d = await r.json()
-      if (d.ok) { setEditFiles(d.data || []); if (d.data?.length) setEditFile(d.data[0]) }
-    } catch (e) { message.error('获取文件列表失败: ' + e.message) }
-  }
-
-  async function loadEditContent(file) {
-    if (!editingContract || !file) return
-    const r = await fetch(`/api/contracts/${editingContract.contract_id}/content?file=` + encodeURIComponent(file))
-    const d = await r.json()
-    if (d.ok) { setEditContent(d.data.content) } else { message.error(d.error?.message || '读取失败') }
-  }
-
-  async function saveEdit() {
-    if (!editingContract || !editFile || editSaving) return
-    setEditSaving(true)
-    try {
-      const r = await fetch(`/api/contracts/${editingContract.contract_id}/content`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file: editFile, content: editContent }),
-      })
-      const d = await r.json()
-      if (d.ok) { message.success(`已保存编辑版：${d.data.file}`); setEditingContract(null); loadContracts() } else { message.error(d.error?.message || '保存失败') }
-    } catch (e) { message.error('保存失败: ' + e.message) } finally { setEditSaving(false) }
-  }
-  useEffect(() => { loadContracts() }, [])
-
-  async function uploadFiles(fileList) {
-    const files = Array.from(fileList || [])
-    if (!files.length || uploading) return
-    setUploading(true); setUploadMsg('上传中...')
-    const fd = new FormData()
-    for (const f of files) fd.append('files', f)
-    try {
-      const r = await fetch('/api/contracts/upload', { method: 'POST', body: fd })
-      const d = await r.json()
-      if (d.ok) {
-        const ok = d.data.filter((x) => x.ok).length
-        setUploadMsg(`完成：${ok}/${d.data.length} 份上传成功`)
-        loadContracts()
-      } else { message.error(d.error?.message || '上传失败'); setUploadMsg('') }
-    } catch (e) { message.error('上传失败: ' + e.message); setUploadMsg('') } finally { setUploading(false) }
-  }
-
-  async function review(cid) {
-    const r = await fetch(`/api/contracts/${cid}/review`, { method: 'POST' })
-    const d = await r.json()
-    if (d.ok) { message.success(`审查完成：${d.risk_count} 处风险（高${d.high}/中${d.medium}/低${d.low}）`); loadContracts() } else { message.error(d.error?.message || '审查失败') }
-  }
-
-  async function remove(cid) {
-    await fetch(`/api/contracts/${cid}`, { method: 'DELETE' })
-    message.success('已删除')
-    loadContracts()
-  }
-
-  async function uploadSkill(fileList) {
-    const files = Array.from(fileList || [])
-    if (!files.length) return
-    for (const f of files) {
-      const fd = new FormData(); fd.append('file', f)
-      const r = await fetch('/api/contracts/skills', { method: 'POST', body: fd })
-      const d = await r.json()
-      if (d.ok) { message.success(`已上传规则：${d.data.filename}`) } else { message.error(d.error?.message || '规则上传失败') }
-    }
-  }
-
-  return (
-    <Card title="合同审查" size="small">
-      <Space direction="vertical" style={{ width: '100%' }}>
-        <Space wrap>
-          <Button onClick={() => document.getElementById('contract-file-input').click()} disabled={uploading}>上传合同（docx/pdf）</Button>
-          <Button onClick={() => document.getElementById('contract-skill-input').click()} disabled={uploading}>上传审查规则（.jsonl）</Button>
-          {uploadMsg && <Text type="secondary">{uploadMsg}</Text>}
-        </Space>
-        <input id="contract-file-input" type="file" accept=".docx,.pdf" multiple style={{ display: 'none' }}
-          onChange={(e) => { uploadFiles(e.target.files); e.target.value = '' }} />
-        <input id="contract-skill-input" type="file" accept=".jsonl" multiple style={{ display: 'none' }}
-          onChange={(e) => { uploadSkill(e.target.files); e.target.value = '' }} />
-        <Text type="secondary">上传后自动脱敏；审查报告为规则引擎生成，使用前须经执业律师核阅。</Text>
-        <List size="small" dataSource={contracts} renderItem={(c) => (
-          <List.Item actions={[
-            <Button key="rv" size="small" type="primary" onClick={() => review(c.contract_id)}>审查</Button>,
-            <Button key="ed" size="small" onClick={() => openEditor(c)}>编辑</Button>,
-            <Button key="rp" size="small" href={`/api/contracts/${c.contract_id}/report`} target="_blank" disabled={!c.report_path}>报告</Button>,
-            <Button key="dl" size="small" href={`/api/contracts/${c.contract_id}/download?kind=redacted`} target="_blank">脱敏版</Button>,
-            <Button key="an" size="small" href={`/api/contracts/${c.contract_id}/download?kind=annotated`} target="_blank">批注版</Button>,
-            <Button key="rs" size="small" href={`/api/contracts/${c.contract_id}/download?kind=restored`} target="_blank">还原版</Button>,
-            <Button key="del" size="small" danger onClick={() => remove(c.contract_id)}>删除</Button>,
-          ]}>
-            <Text>{c.original_name}</Text>
-            <Tag color="blue">{c.status}</Tag>
-            <Text type="secondary">{c.risk_count} 处风险</Text>
-          </List.Item>
-        )} />
-        <Modal open={!!editingContract} onCancel={() => setEditingContract(null)} onOk={saveEdit} okText="保存编辑版" cancelText="取消" confirmLoading={editSaving} width={820} title={`编辑合同（${editingContract?.original_name || ''}）`}>
-          <Space direction="vertical" style={{ width: '100%' }}>
-            <Space>
-              <Text strong>选择文件：</Text>
-              <Select size="small" style={{ width: 280 }} value={editFile} onChange={(v) => { setEditFile(v); loadEditContent(v) }} options={editFiles.map((f) => ({ value: f, label: f }))} />
-            </Space>
-            <Input.TextArea value={editContent} onChange={(e) => setEditContent(e.target.value)} autoSize={{ minRows: 12, maxRows: 30 }} />
-            <Text type="secondary" style={{ fontSize: 12 }}>保存后生成「编辑版.md」，再次审查时会一并扫描。</Text>
           </Space>
         </Modal>
       </Space>
