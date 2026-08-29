@@ -12,18 +12,18 @@ import {
 const { Text } = Typography
 
 const MASK_CATEGORIES = [
-  { key: 'person_name', label: '人名' },
-  { key: 'company_name', label: '企业名' },
-  { key: 'credit_code', label: '信用代码' },
-  { key: 'phone', label: '电话' },
-  { key: 'email', label: '邮箱' },
-  { key: 'id_card', label: '身份证号' },
+  { value: 'person_name', label: '人名' },
+  { value: 'company_name', label: '企业名' },
+  { value: 'credit_code', label: '信用代码' },
+  { value: 'phone', label: '电话' },
+  { value: 'email', label: '邮箱' },
+  { value: 'id_card', label: '身份证号' },
 ]
 
 const MASK_METHODS = [
-  { key: 'mask', label: '中间打码' },
-  { key: 'placeholder', label: '占位符' },
-  { key: 'hash', label: '哈希值' },
+  { value: 'mask', label: '中间打码' },
+  { value: 'placeholder', label: '占位符' },
+  { value: 'hash', label: '哈希值' },
 ]
 
 function Markdown({ content, style }) {
@@ -70,6 +70,7 @@ export default function ContractPage() {
   const [selectedRuleFiles, setSelectedRuleFiles] = useState([])
   const [ruleModalOpen, setRuleModalOpen] = useState(false)
   const [ruleModalSelected, setRuleModalSelected] = useState([])
+  const [ruleUploading, setRuleUploading] = useState(false)
 
   // 重命名
   const [renameTarget, setRenameTarget] = useState(null)
