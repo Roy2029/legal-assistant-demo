@@ -47,10 +47,11 @@ export default function ContractPage() {
   const [rightTab, setRightTab] = useState('mask')
 
   // 脱敏 tab
-  const [maskCategories, setMaskCategories] = useState(['person_name', 'company_name', 'credit_code', 'phone', 'email', 'id_card'])
+  const [maskCategory, setMaskCategory] = useState('person_name')
   const [maskMethod, setMaskMethod] = useState('placeholder')
   const [scanItems, setScanItems] = useState([])
   const [selectedScanIds, setSelectedScanIds] = useState([])
+  const [configItems, setConfigItems] = useState([])
   const [scanning, setScanning] = useState(false)
   const [masking, setMasking] = useState(false)
   const [mappingEntries, setMappingEntries] = useState([])
@@ -59,7 +60,7 @@ export default function ContractPage() {
   const [restorePreview, setRestorePreview] = useState(null)
   const [selectionText, setSelectionText] = useState('')
   const [manualCategory, setManualCategory] = useState('manual')
-  const [manualItems, setManualItems] = useState([])
+  const [previewSearch, setPreviewSearch] = useState('')
 
   // 审查 tab
   const [chatSessionId, setChatSessionId] = useState(null)
@@ -110,7 +111,6 @@ export default function ContractPage() {
     if (!selectedCid) return
     loadVersions(selectedCid)
     loadMapping(selectedCid)
-    loadManualItems(selectedCid)
     loadRuleLibrary()
     loadChatSession(selectedCid)
   }, [selectedCid])
@@ -189,23 +189,24 @@ export default function ContractPage() {
     if (!selectedCid) return
     setScanning(true)
     try {
-      const cats = maskCategories.join(',')
-      const r = await fetch(`/api/contracts/${selectedCid}/scan?categories=${encodeURIComponent(cats)}`)
+      const r = await fetch(`/api/contracts/${selectedCid}/scan?categories=${encodeURIComponent(maskCategory)}`)
       const d = await r.json()
       if (d.ok) {
         setScanItems(d.data.items || [])
         setSelectedScanIds((d.data.items || []).map((x) => x.id))
-        message.success(`扫描到 ${d.data.total} 项待脱敏信息`)
+        message.success(`「${MASK_CATEGORIES.find((c) => c.value === maskCategory)?.label || maskCategory}」扫描到 ${d.data.total} 个候选`)
       } else { message.error(d.error?.message || '扫描失败') }
     } catch (e) { message.error('扫描失败: ' + e.message) } finally { setScanning(false) }
   }
 
-  async function loadManualItems(cid) {
-    try {
-      const r = await fetch(`/api/contracts/${cid}/mask/manual`)
-      const d = await r.json()
-      if (d.ok) setManualItems(d.data || [])
-    } catch (e) { /* ignore */ }
+  function addSelectedToConfig() {
+    const chosen = scanItems.filter((x) => selectedScanIds.includes(x.id))
+    if (!chosen.length) { message.warning('请先勾选候选项目'); return }
+    setConfigItems((xs) => {
+      const ids = new Set(xs.map((x) => x.id))
+      return [...xs, ...chosen.filter((x) => !ids.has(x.id))]
+    })
+    message.success(`已加入 ${chosen.length} 项到待脱敏配置清单`)
   }
 
   async function addSelectionToMask() {
@@ -217,19 +218,21 @@ export default function ContractPage() {
       })
       const d = await r.json()
       if (d.ok) {
-        setManualItems((xs) => [...xs, d.data])
-        setSelectedScanIds((ids) => [...ids, d.data.id])
+        setConfigItems((xs) => {
+          const ids = new Set(xs.map((x) => x.id))
+          return ids.has(d.data.id) ? xs : [...xs, d.data]
+        })
         setSelectionText('')
-        message.success('已加入脱敏清单')
+        message.success('已加入待脱敏配置清单')
       } else { message.error(d.error?.message || '加入失败') }
     } catch (e) { message.error('加入失败: ' + e.message) }
   }
 
-  async function removeManualItem(item) {
-    if (!selectedCid) return
-    await fetch(`/api/contracts/${selectedCid}/mask/manual/${item.id}`, { method: 'DELETE' })
-    setManualItems((xs) => xs.filter((x) => x.id !== item.id))
-    setSelectedScanIds((ids) => ids.filter((x) => x !== item.id))
+  function removeConfigItem(item) {
+    setConfigItems((xs) => xs.filter((x) => x.id !== item.id))
+    if (item.category === 'manual' && selectedCid) {
+      fetch(`/api/contracts/${selectedCid}/mask/manual/${item.id}`, { method: 'DELETE' }).catch(() => {})
+    }
   }
 
   async function loadMapping(cid) {
@@ -242,13 +245,12 @@ export default function ContractPage() {
 
   async function confirmMask() {
     if (!selectedCid) return
-    const chosen = [...scanItems, ...manualItems].filter((x) => selectedScanIds.includes(x.id))
-    if (!chosen.length) { message.warning('请先勾选待脱敏项目'); return }
+    if (!configItems.length) { message.warning('请先扫描并勾选候选项目加入待脱敏配置清单'); return }
     setMasking(true)
     try {
       const r = await fetch(`/api/contracts/${selectedCid}/mask`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ categories: maskCategories, method: maskMethod, items: scanItems.filter((x) => selectedScanIds.includes(x.id)), manual_items: manualItems.filter((x) => selectedScanIds.includes(x.id)) }),
+        body: JSON.stringify({ categories: [maskCategory], method: maskMethod, items: configItems }),
       })
       const d = await r.json()
       if (d.ok) {
@@ -286,6 +288,47 @@ export default function ContractPage() {
   function captureSelection() {
     const sel = window.getSelection().toString().trim()
     if (sel) setSelectionText(sel)
+  }
+
+  function renderHighlightedText(text, search, ranges) {
+    const segs = []
+    if (search) {
+      const q = search.toLowerCase()
+      const lower = text.toLowerCase()
+      let idx = 0
+      while (true) {
+        idx = lower.indexOf(q, idx)
+        if (idx < 0) break
+        segs.push([idx, idx + q.length, 'search'])
+        idx += q.length
+      }
+    }
+    for (const r of ranges || []) {
+      const s = Number(r.start)
+      const e = Number(r.end)
+      if (s >= 0 && e > s && e <= text.length) segs.push([s, e, r.category || 'scan'])
+    }
+    if (!segs.length) return text
+    segs.sort((a, b) => a[0] - b[0] || a[1] - b[1])
+    const merged = []
+    for (const s of segs) {
+      if (merged.length && s[0] <= merged[merged.length - 1][1]) {
+        const last = merged[merged.length - 1]
+        last[1] = Math.max(last[1], s[1])
+        if (last[2] !== 'search') last[2] = s[2] === 'search' ? 'search' : last[2]
+      } else {
+        merged.push([s[0], s[1], s[2]])
+      }
+    }
+    const out = []
+    let pos = 0
+    for (const [s, e, kind] of merged) {
+      if (s > pos) out.push(text.slice(pos, s))
+      out.push(<mark key={s + ':' + e} style={{ background: kind === 'search' ? '#ffeb3b' : '#bae7ff', padding: '0 1px', borderRadius: 2 }}>{text.slice(s, e)}</mark>)
+      pos = e
+    }
+    if (pos < text.length) out.push(text.slice(pos))
+    return out
   }
 
   async function loadRuleLibrary() {
@@ -372,17 +415,20 @@ export default function ContractPage() {
   }
 
   const currentFile = versions.find((v) => v.kind === 'masked')?.file || versions.find((v) => v.kind === 'redacted')?.file || ''
-  const scanList = [...scanItems, ...manualItems]
 
   const maskTab = (
     <Space direction="vertical" style={{ width: '100%' }} size={6}>
-      <Text strong>脱敏项目</Text>
-      <Checkbox.Group
-        options={MASK_CATEGORIES}
-        value={maskCategories}
-        onChange={(v) => setMaskCategories(v)}
-        style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}
-      />
+      <Space wrap>
+        <Text strong>脱敏项目：</Text>
+        <Select
+          size="small"
+          value={maskCategory}
+          onChange={setMaskCategory}
+          style={{ width: 120 }}
+          options={MASK_CATEGORIES}
+        />
+        <Button size="small" type="primary" icon={<ScanOutlined />} loading={scanning} onClick={scanPii}>扫描当前项目</Button>
+      </Space>
       <Text strong>脱敏方式</Text>
       <Radio.Group
         options={MASK_METHODS}
@@ -392,7 +438,6 @@ export default function ContractPage() {
         size="small"
       />
       <Space wrap>
-        <Button size="small" type="primary" icon={<ScanOutlined />} loading={scanning} onClick={scanPii}>扫描待脱敏项目</Button>
         <Select
           size="small"
           value={manualCategory}
@@ -400,28 +445,50 @@ export default function ContractPage() {
           style={{ width: 110 }}
           options={[{ value: 'manual', label: '手动片段' }, ...MASK_CATEGORIES]}
         />
-        <Button size="small" disabled={!selectionText} onClick={addSelectionToMask}>加入选中片段</Button>
+        <Button size="small" disabled={!selectionText} onClick={addSelectionToMask}>拖选片段加入配置清单</Button>
       </Space>
       {selectionText && <Text type="secondary" style={{ fontSize: 12 }}>已拖选：{selectionText.slice(0, 30)}{selectionText.length > 30 ? '…' : ''}</Text>}
-      <Text strong>待脱敏清单（勾选生效）</Text>
-      <div style={{ maxHeight: 200, overflow: 'auto', border: '1px solid #f0f0f0', padding: 6, borderRadius: 6 }}>
-        {!scanList.length && <Text type="secondary" style={{ fontSize: 12 }}>点击「扫描待脱敏项目」或拖选原文片段加入清单</Text>}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text strong>候选列表（扫描结果）</Text>
+        <Space size={4}>
+          <Button size="small" type="link" onClick={() => setSelectedScanIds(scanItems.map((x) => x.id))}>全选</Button>
+          <Button size="small" type="link" onClick={() => setSelectedScanIds([])}>全不选</Button>
+        </Space>
+      </div>
+      <div style={{ maxHeight: 160, overflow: 'auto', border: '1px solid #f0f0f0', padding: 6, borderRadius: 6 }}>
+        {!scanItems.length && <Text type="secondary" style={{ fontSize: 12 }}>先选择单个脱敏项目，点击「扫描当前项目」得到候选列表</Text>}
         <Checkbox.Group value={selectedScanIds} onChange={setSelectedScanIds} style={{ width: '100%' }}>
-          {scanList.map((it) => (
+          {scanItems.map((it) => (
             <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginBottom: 2 }}>
               <Checkbox value={it.id}>
-                <Tag color={it.category === 'manual' ? 'orange' : 'blue'}>{it.category_label || it.category}</Tag>
+                <Tag color="blue">{it.category_label || it.category}</Tag>
                 <Text style={{ fontSize: 12 }}>{(it.value || '').slice(0, 24)}{(it.value || '').length > 24 ? '…' : ''}</Text>
                 <Text type="secondary" style={{ fontSize: 12 }}> → {it.preview || it.value}</Text>
               </Checkbox>
-              {it.category === 'manual' && <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => removeManualItem(it)} />}
             </div>
           ))}
         </Checkbox.Group>
       </div>
+      <Button size="small" block onClick={addSelectedToConfig} disabled={!selectedScanIds.length}>加入待脱敏配置清单</Button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text strong>待脱敏配置清单</Text>
+        <Text type="secondary" style={{ fontSize: 12 }}>{configItems.length} 项</Text>
+      </div>
+      <div style={{ maxHeight: 140, overflow: 'auto', border: '1px solid #f0f0f0', padding: 6, borderRadius: 6 }}>
+        {!configItems.length && <Text type="secondary" style={{ fontSize: 12 }}>从候选列表勾选加入，或拖选原文片段加入</Text>}
+        {configItems.map((it) => (
+          <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+            <span>
+              <Tag color={it.category === 'manual' ? 'orange' : 'green'}>{it.category_label || it.category}</Tag>
+              <Text style={{ fontSize: 12 }}>{(it.value || '').slice(0, 24)}{(it.value || '').length > 24 ? '…' : ''}</Text>
+            </span>
+            <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => removeConfigItem(it)} />
+          </div>
+        ))}
+      </div>
       <Button type="primary" block loading={masking} onClick={confirmMask}>确认脱敏</Button>
       <Text strong>脱密映射配置</Text>
-      <div style={{ maxHeight: 180, overflow: 'auto', border: '1px solid #f0f0f0', padding: 6, borderRadius: 6 }}>
+      <div style={{ maxHeight: 160, overflow: 'auto', border: '1px solid #f0f0f0', padding: 6, borderRadius: 6 }}>
         {!mappingEntries.length && <Text type="secondary" style={{ fontSize: 12 }}>确认脱敏后生成映射配置</Text>}
         <Checkbox.Group value={selectedMapIds} onChange={setSelectedMapIds} style={{ width: '100%' }}>
           {mappingEntries.map((e) => (
@@ -511,7 +578,7 @@ export default function ContractPage() {
   }
 
   return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'stretch', minHeight: 'calc(100vh - 170px)' }}>
+    <div style={{ display: 'flex', gap: 8, alignItems: 'stretch', height: 'calc(100vh - 170px)' }}>
       {/* 左折叠按钮 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, justifyContent: 'flex-start' }}>
         <Button size="small" type="text" icon={leftCollapsed ? <RightOutlined /> : <LeftOutlined />} onClick={() => setLeftCollapsed(!leftCollapsed)} />
@@ -554,15 +621,29 @@ export default function ContractPage() {
       )}
 
       {/* 中间：预览 */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
-        <Card size="small" title={selected ? `预览：${selected.original_name}` : '请选择文档'} loading={previewLoading}
-          style={{ flex: 1, overflow: 'auto' }}
-          styles={{ body: { height: '100%', overflow: 'auto' } }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0, minHeight: 0 }}>
+        <Card
+          size="small"
+          title={selected ? `预览：${selected.original_name}` : '请选择文档'}
+          loading={previewLoading}
+          style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+          styles={{ body: { flex: 1, minHeight: 0, overflow: 'auto', padding: 8 } }}
+          extra={
+            <Input
+              size="small"
+              allowClear
+              placeholder="搜索预览内容"
+              value={previewSearch}
+              onChange={(e) => setPreviewSearch(e.target.value)}
+              style={{ width: 200 }}
+            />
+          }
+        >
           {previewContent ? (
             <pre
               onMouseUp={captureSelection}
-              style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 13, lineHeight: 1.7, margin: 0, userSelect: 'text' }}
-            >{previewContent}</pre>
+              style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 13, lineHeight: 1.7, margin: 0, userSelect: 'text', minHeight: '100%' }}
+            >{renderHighlightedText(previewContent, previewSearch, versionKey.startsWith('original::') ? scanItems : [])}</pre>
           ) : <Empty description="选择文档后加载内容" />}
         </Card>
         <Card size="small" styles={{ body: { padding: 8 } }}>

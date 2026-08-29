@@ -185,11 +185,19 @@ def _resolve_version(cid: str, kind: str, file: str) -> Path | None:
         for p in _list_raw_files(cid):
             if p.name == file:
                 return p
-    elif kind in ("redacted", "masked", "edited", "annotated"):
+    elif kind in ("redacted", "masked", "edited"):
         for p in _list_redacted_files(cid):
             if p.name == file:
                 return p
-    elif kind in ("report", "annotated"):
+    elif kind == "annotated":
+        # 批注版可能在工作区（Markdown）或报告目录（DOCX）
+        for p in _list_redacted_files(cid):
+            if p.name == file:
+                return p
+        for p in _list_dir_files(_report_dir(cid)):
+            if p.name == file:
+                return p
+    elif kind == "report":
         for p in _list_dir_files(_report_dir(cid)):
             if p.name == file:
                 return p
@@ -773,13 +781,22 @@ async def contract_agent_chat(contract_id: str, payload: dict):
             report_path = report_dir / "report.md"
             report_path.write_text(report or answer, encoding="utf-8")
             _update_contract(contract_id, status="reviewed", report_path=str(report_path), risk_count=len(risks))
-            # 生成批注版 DOCX（基于脱敏文本）
+            # 基于脱敏文本 + 最终风险清单，统一生成批注版 Markdown（工作区）和 DOCX（报告目录）
             if current_file:
                 masked_text = _content_for(contract_id, "masked", current_file)
                 if masked_text is None:
                     masked_text = _content_for(contract_id, "redacted", current_file)
                 if masked_text:
                     from online_core import contract_rules
+                    if not risks:
+                        risks = contract_rules.scan_text(masked_text, file_name=current_file)
+                    try:
+                        annotated_md = contract_rules.annotate_text_markdown(masked_text, risks)
+                        md_path = _redacted_dir(contract_id) / f"{Path(current_file).stem}_批注版.md"
+                        md_path.parent.mkdir(parents=True, exist_ok=True)
+                        md_path.write_text(annotated_md, encoding="utf-8")
+                    except Exception:
+                        pass
                     out_path = report_dir / f"{Path(current_file).stem}_批注版.docx"
                     try:
                         contract_rules.annotate_text_docx(masked_text, risks, out_path)

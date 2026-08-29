@@ -131,23 +131,80 @@ def render_report(file_names: list[str], risks: list[dict]) -> str:
 # D11：可配置脱敏后的批注版生成（Markdown + DOCX）
 # ---------------------------------------------------------------------------
 
+def _risk_key(r: dict) -> str:
+    for k in ("snippet", "clause", "clause_text", "original"):
+        v = (r.get(k) or "").strip().strip("\"'")
+        if v:
+            return v
+    return ""
+
+
+def _norm(s: str) -> str:
+    import re
+    return re.sub(r"\s+", "", s)
+
+
+def _match_line(line: str, risk_key: str) -> bool:
+    nline = _norm(line)
+    nkey = _norm(risk_key)
+    if not nkey:
+        return False
+    if nkey in nline:
+        return True
+    # 兼容跨行/空格差异：取风险片段前 20 个有效字符
+    head = nkey[:20]
+    if len(head) >= 6 and head in nline:
+        return True
+    head = nkey[:10]
+    if len(head) >= 4 and head in nline:
+        return True
+    return False
+
+
+def _find_line_matches(lines: list, risks: list) -> tuple:
+    """返回 (line_idx -> [risk...], 未匹配 risks)。"""
+    matched = {}
+    unmatched = []
+    for r in risks:
+        key = _risk_key(r)
+        if not key:
+            unmatched.append(r)
+            continue
+        found = False
+        for i, line in enumerate(lines):
+            if _match_line(line, key):
+                matched.setdefault(i, []).append(r)
+                found = True
+        if not found:
+            unmatched.append(r)
+    return matched, unmatched
+
+
+def _tip_text(r: dict) -> str:
+    return "[{level}] {desc} → {sugg}".format(
+        level=r.get("risk_level", "medium"),
+        desc=r.get("risk_desc", ""),
+        sugg=r.get("suggestion", "") or r.get("suggestion_template", ""),
+    )
+
+
 def annotate_text_markdown(text: str, risks: list) -> str:
-    """在脱敏文本上按风险清单插入批注，返回 Markdown。"""
+    """在脱敏文本上按风险清单插入批注，返回 Markdown。未定位到的风险在文末汇总。"""
     lines = text.splitlines() or [text]
+    line_matches, unmatched = _find_line_matches(lines, risks)
     out_lines = []
-    for line in lines:
+    for i, line in enumerate(lines):
         out_lines.append(line)
-        matched = [r for r in risks if r.get("snippet") and r["snippet"][:20] in line]
-        if not matched:
-            matched = [r for r in risks if r.get("clause") and r["clause"][:20] in line]
-        if matched:
-            for r in matched:
-                tip = "[{level}] {desc} → {sugg}".format(
-                    level=r.get("risk_level", "medium"),
-                    desc=r.get("risk_desc", ""),
-                    sugg=r.get("suggestion", "") or r.get("suggestion_template", ""),
-                )
-                out_lines.append("> **风险提示** " + tip)
+        for r in line_matches.get(i, []):
+            out_lines.append("> **风险提示** " + _tip_text(r))
+    if unmatched:
+        out_lines.append("")
+        out_lines.append("> # 未定位到原文段落的批注汇总")
+        for r in unmatched:
+            out_lines.append("> **风险提示** " + _tip_text(r))
+            key = _risk_key(r)
+            if key:
+                out_lines.append("> 相关片段：" + key[:120])
     return chr(10).join(out_lines)
 
 
@@ -161,11 +218,11 @@ def annotate_text_docx(text: str, risks: list, output_path) -> int:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     doc = docx.Document()
     notes = 0
-    for line in (text.splitlines() or [text]):
+    lines = text.splitlines() or [text]
+    line_matches, unmatched = _find_line_matches(lines, risks)
+    for i, line in enumerate(lines):
         para = doc.add_paragraph(line)
-        matched = [r for r in risks if r.get("snippet") and r["snippet"][:20] in line]
-        if not matched:
-            matched = [r for r in risks if r.get("clause") and r["clause"][:20] in line]
+        matched = line_matches.get(i, [])
         if matched:
             for run in para.runs:
                 try:
@@ -173,15 +230,25 @@ def annotate_text_docx(text: str, risks: list, output_path) -> int:
                 except Exception:
                     pass
             for r in matched:
-                tip = "[{level}] {desc} → {sugg}".format(
-                    level=r.get("risk_level", "medium"),
-                    desc=r.get("risk_desc", ""),
-                    sugg=r.get("suggestion", "") or r.get("suggestion_template", ""),
-                )
                 note = doc.add_paragraph()
-                run = note.add_run("【风险提示】" + tip)
+                run = note.add_run("【风险提示】" + _tip_text(r))
                 run.font.color.rgb = RGBColor(0xC0, 0x00, 0x00)
                 run.font.bold = True
                 notes += 1
+    if unmatched:
+        doc.add_paragraph()
+        summary = doc.add_paragraph()
+        srun = summary.add_run("未定位到原文段落的批注汇总")
+        srun.font.bold = True
+        for r in unmatched:
+            note = doc.add_paragraph()
+            run = note.add_run("【风险提示】" + _tip_text(r))
+            run.font.color.rgb = RGBColor(0xC0, 0x00, 0x00)
+            run.font.bold = True
+            notes += 1
+            key = _risk_key(r)
+            if key:
+                frag = doc.add_paragraph("相关片段：" + key[:120])
+                frag.runs[0].font.color.rgb = RGBColor(0x60, 0x60, 0x60)
     doc.save(str(output_path))
     return notes

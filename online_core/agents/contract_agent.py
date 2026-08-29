@@ -127,6 +127,8 @@ class ContractAgent(BaseReActAgent):
 
     def _annotate_contract_file(self, file: str, risks: list) -> dict:
         text = self._read_contract_file(file)
+        if not risks:
+            risks = contract_rules.scan_text(text, file_name=file)
         annotated = contract_rules.annotate_text_markdown(text, risks)
         stem = Path(file).stem
         out = f"{stem}_批注版.md"
