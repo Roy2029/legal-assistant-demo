@@ -144,10 +144,12 @@ class RAGAgent(BaseReActAgent):
         timeout = {"kb_search": 90, "kb_index": 10, "read_file": 15, "write_file": 15, "finish": 10}.get(name, 15)
         try:
             if name == "kb_index":
-                return await asyncio.wait_for(asyncio.to_thread(self._kb_index), timeout)
+                data = await asyncio.wait_for(asyncio.to_thread(self._kb_index), timeout)
+                return {"ok": True, **data}
             if name == "kb_search":
                 groups = args.get("groups") or []
-                return await asyncio.wait_for(asyncio.to_thread(orchestrate, groups, self.svc), timeout)
+                data = await asyncio.wait_for(asyncio.to_thread(orchestrate, groups, self.svc), timeout)
+                return {"ok": True, **data}
             if name == "read_file":
                 return await asyncio.wait_for(asyncio.to_thread(self._read_file, args.get("path", "")), timeout)
             if name == "write_file":
