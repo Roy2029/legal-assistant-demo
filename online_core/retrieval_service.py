@@ -49,6 +49,21 @@ class RetrievalOutput:
     trace: dict = field(default_factory=dict)
 
 
+def _corpus_public_condition() -> dict:
+    """公共库 corpus 条件：corpus=="public" 或 corpus 字段缺失/为空。
+
+    历史公共 chunk 由旧重建脚本生成，未写 corpus 标签（仅 law_name/article_no/articles/doc_type）；
+    公共作用域必须同时命中已正确打标与缺失标签的 chunk，且不得命中 user/case 库 chunk。
+    `is_empty` 为 Qdrant 独立条件：字段缺失、null 或空数组均命中。
+    """
+    return {
+        "should": [
+            {"key": "metadata.corpus", "match": {"value": "public"}},
+            {"is_empty": {"key": "metadata.corpus"}},
+        ]
+    }
+
+
 def build_kb_filters(
     corpus_scope: str = "all",
     user_folders: Optional[list[str]] = None,
@@ -69,7 +84,7 @@ def build_kb_filters(
         user_selected = [f for f in folders if f != "__public__"]
         if public_selected and user_selected:
             base_should = [
-                {"key": "metadata.corpus", "match": {"value": "public"}},
+                _corpus_public_condition(),
                 {
                     "must": [
                         {"key": "metadata.corpus", "match": {"value": "user"}},
@@ -79,7 +94,7 @@ def build_kb_filters(
                 },
             ]
         elif public_selected:
-            must.append({"key": "metadata.corpus", "match": {"value": "public"}})
+            must.append(_corpus_public_condition())
         elif user_selected:
             must.append({"key": "metadata.corpus", "match": {"value": "user"}})
             must.append({"key": "metadata.user_id", "match": {"value": "local"}})
@@ -89,7 +104,7 @@ def build_kb_filters(
         must.append({"key": "metadata.user_id", "match": {"value": "local"}})
         must.append({"key": "metadata.folder", "match": {"any": list(user_folders)}})
     elif corpus_scope == "public":
-        must.append({"key": "metadata.corpus", "match": {"value": "public"}})
+        must.append(_corpus_public_condition())
     elif corpus_scope == "user":
         must.append({"key": "metadata.corpus", "match": {"value": "user"}})
         must.append({"key": "metadata.user_id", "match": {"value": "local"}})

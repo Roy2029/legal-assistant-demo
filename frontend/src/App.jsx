@@ -578,8 +578,6 @@ function KbPage() {
   const [newFolder, setNewFolder] = useState('')
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState('')
-  const [rebuilding, setRebuilding] = useState(false)
-  const [rebuildMsg, setRebuildMsg] = useState('')
   const [chunkViewDoc, setChunkViewDoc] = useState(null)
   const [chunks, setChunks] = useState([])
   const [editingChunk, setEditingChunk] = useState(null)
@@ -700,28 +698,6 @@ function KbPage() {
     if (d.ok) { message.success(`已创建文件夹：${name}`); setNewFolder(''); setFolder(name); loadFolders() } else { message.error(d.error?.message || '创建失败') }
   }
 
-  async function rebuildKb() {
-    Modal.confirm({
-      title: '重建法律库索引',
-      content: '将释放检索服务并后台重建索引，期间知识库问答可能暂时不可用。确认继续？',
-      okText: '重建', cancelText: '取消',
-      onOk: async () => {
-        setRebuilding(true); setRebuildMsg('重建启动中...')
-        const r = await fetch('/api/kb/rebuild', { method: 'POST' })
-        const d = await r.json()
-        if (!d.ok) { message.error(d.error?.message || '启动失败'); setRebuilding(false); return }
-        const timer = setInterval(async () => {
-          try {
-            const s = await fetch('/api/kb/rebuild/status').then((x) => x.json())
-            const st = s.data || {}
-            if (st.running) { setRebuildMsg(`重建中...（已启动 ${st.started_at || ''}）`) }
-            else { clearInterval(timer); setRebuilding(false); setRebuildMsg(st.ok ? '重建完成' : `重建失败：${st.error || '未知错误'}`); message.info('法律库索引已更新'); loadFolders(); loadDocs() }
-          } catch (e) { clearInterval(timer); setRebuilding(false); setRebuildMsg('状态查询失败') }
-        }, 5000)
-      },
-    })
-  }
-
   async function saveRenameFolder() {
     const name = (renameText || '').trim()
     if (!renamingFolder || !name) return
@@ -805,8 +781,6 @@ function KbPage() {
           <Text strong>新建文件夹：</Text>
           <Input size="small" style={{ width: 160 }} placeholder="新文件夹名" value={newFolder} onChange={(e) => setNewFolder(e.target.value)} onPressEnter={createFolder} />
           <Button size="small" onClick={createFolder}>新建</Button>
-          <Button size="small" danger onClick={rebuildKb} loading={rebuilding}>重建法律库</Button>
-          {rebuildMsg && <Text type="secondary">{rebuildMsg}</Text>}
         </Space>
         <Space wrap>
           <Text strong>批量移动：</Text>

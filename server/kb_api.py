@@ -6,7 +6,6 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, UploadFile
-from fastapi.responses import JSONResponse
 
 from .db import get_engine
 import sqlalchemy as sa
@@ -203,43 +202,6 @@ def delete_folder(kb_id: str, cascade: bool = False):
         conn.execute(sa.text("DELETE FROM user_kb WHERE kb_id=:k"), {"k": kb_id})
     engine.dispose()
     return {"ok": True}
-
-
-@router.post("/rebuild")
-def rebuild_kb():
-    """手动重建法律库索引：释放 Qdrant 锁后启动后台重建脚本。"""
-    import subprocess
-    import sys as _sys
-
-    intermediate = PROJECT_ROOT / "data" / "indices" / "法律" / "chunk_v2_intermediate" / "chunks.jsonl"
-    if not intermediate.exists():
-        return JSONResponse(
-            {"ok": False, "error": {"code": "no_intermediate", "message": "安装包未包含重建索引中间产物，无法重建；请重新安装完整包或联系管理员。"}},
-            status_code=400,
-        )
-
-    from online_core.retrieval_service import get_retrieval_service
-    svc = get_retrieval_service()
-    svc.close()  # 释放嵌入式 Qdrant 文件锁，否则重建脚本无法写入
-
-    subprocess.Popen(
-        [_sys.executable, str(PROJECT_ROOT / "scripts" / "run_rebuild_managed.py")],
-        cwd=str(PROJECT_ROOT),
-    )
-    return {"ok": True, "data": {"started": True, "message": "重建已启动，请稍后在状态接口查询进度"}}
-
-
-@router.get("/rebuild/status")
-def rebuild_kb_status():
-    import json as _json
-    status_path = PROJECT_ROOT / "data" / "logs" / "rebuild.status.json"
-    if not status_path.exists():
-        return {"ok": True, "data": {"running": False, "last": None}}
-    try:
-        data = _json.loads(status_path.read_text(encoding="utf-8"))
-    except Exception:
-        data = {"running": False, "error": "status parse error"}
-    return {"ok": True, "data": data}
 
 
 @router.post("/upload")
