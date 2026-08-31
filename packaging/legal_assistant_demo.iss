@@ -42,8 +42,8 @@ Source: "..\frontend\dist\*"; DestDir: "{app}\frontend\dist"; Flags: recursesubd
 ; 本地 embedding 模型（必打包）
 Source: "..\models\bge-base-zh\*"; DestDir: "{app}\models\bge-base-zh"; Flags: recursesubdirs createallsubdirs
 
-; 法律库索引（运行时检索必需）
-Source: "..\data\indices\法律\qdrant\*"; DestDir: "{app}\data\indices\法律\qdrant"; Flags: recursesubdirs createallsubdirs
+; 法律库索引（运行时检索必需；排除运行期锁文件）
+Source: "..\data\indices\法律\qdrant\*"; DestDir: "{app}\data\indices\法律\qdrant"; Excludes: "*.lock"; Flags: recursesubdirs createallsubdirs
 Source: "..\data\indices\法律\manifest.json"; DestDir: "{app}\data\indices\法律"; Flags: ignoreversion
 
 ; 安装/启动脚本
