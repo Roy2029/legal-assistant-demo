@@ -1,11 +1,13 @@
-; Inno Setup 6 打包脚本（草案）
+; Inno Setup 6 打包脚本（v0.3.0）
 ; 编译前请确认：
 ; 1) 已执行 frontend\npm run build 生成 frontend\dist
 ; 2) 已把 bge-base-zh 模型复制到 项目根\models\bge-base-zh
 ; 3) 目标机已安装 Python 3.12（安装包不含 Python/wheelhouse）
+; 4) 案例检索为外部依赖 WenshuMCP（默认 C:\Users\Roy\WorkBuddy\WenshuMCP，
+;    可用 WENSHU_MCP_PROJECT/WENSHU_MCP_PYTHON 覆盖），安装包不含该项目
 
 #define MyAppName "法律助手 Demo"
-#define MyAppVersion "0.2.0"
+#define MyAppVersion "0.3.0"
 #define MyAppPublisher "Legal Assistant Demo"
 #define MyAppExeName "start_legal_assistant.bat"
 
@@ -31,7 +33,6 @@ PrivilegesRequired=admin
 Source: "..\server\*"; DestDir: "{app}\server"; Flags: recursesubdirs createallsubdirs
 Source: "..\online_core\*"; DestDir: "{app}\online_core"; Flags: recursesubdirs createallsubdirs
 Source: "..\offline_core\*"; DestDir: "{app}\offline_core"; Flags: recursesubdirs createallsubdirs
-Source: "..\utils\*"; DestDir: "{app}\utils"; Flags: recursesubdirs createallsubdirs
 Source: "..\skills\*"; DestDir: "{app}\skills"; Flags: recursesubdirs createallsubdirs
 Source: "..\prompts\*"; DestDir: "{app}\prompts"; Flags: recursesubdirs createallsubdirs
 
@@ -50,12 +51,11 @@ Source: "..\requirements.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\install_deps.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\start_legal_assistant.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\scripts\start_prod.py"; DestDir: "{app}\scripts"; Flags: ignoreversion
-Source: "..\scripts\run_rebuild_managed.py"; DestDir: "{app}\scripts"; Flags: ignoreversion
-Source: "..\scripts\rebuild_index_from_intermediate.py"; DestDir: "{app}\scripts"; Flags: ignoreversion
 
-; 明确不打包：data\sqlite.db / data\config.json / data\logs / data\uploads /
+; 明确不打包：data\sqlite.db / data\config.json / data\logs(含 traces) / data\uploads /
 ; data\agent_workspace / data\contracts / data\keys / data\anonymization /
-; data\indices\法律\qdrant_old_* / chunk_v2_intermediate / chunks_v2.jsonl
+; data\indices\法律\qdrant_old_* / chunk_v2_intermediate / chunks_v2.jsonl（重建已下线）
+; WenshuMCP 项目与凭据（.env / data\config.json）
 
 [Dirs]
 Name: "{app}\data\logs"
