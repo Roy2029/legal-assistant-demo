@@ -58,4 +58,5 @@ backup/
 .claude/
 .codex/
 .playwright-mcp/
+packaging/output/
 
