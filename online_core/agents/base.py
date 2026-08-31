@@ -12,7 +12,12 @@ WORKSPACE_ROOT = PROJECT_ROOT / "data" / "agent_workspace"
 
 MAX_ITERATIONS = 10
 LOOP_TIMEOUT = 180.0
-CONTEXT_MAX_TOKENS = 200_000
+CONTEXT_MAX_TOKENS = 128_000  # 与 DeepSeek 上下文窗口对齐（字符估算 1 token ≈ 2 chars）
+
+CHITCHAT_GUIDANCE = (
+    "\n\n通用对话原则：如果用户发来的是问候、寒暄或其他与任务无关的消息，"
+    "请以对话方式直接、简短地回应，不要调用任何工具，也不要使用任何报告或模板格式。"
+)
 TOOL_TIMEOUTS = {"kb_search": 90, "kb_index": 10, "read_file": 15, "write_file": 15, "finish": 10, "case_search": 90, "case_read": 90}
 CONCURRENCY_LIMIT = 2
 
@@ -95,7 +100,7 @@ class BaseReActAgent:
         return keep_head + [{"role": "system", "content": summary}] + keep_recent
 
     # ── 主循环 ──────────────────────────────────────────────────
-    async def run(self, query: str, event_cb=None, **kwargs) -> dict:
+    async def run(self, query: str, event_cb=None, history: list[dict] | None = None, **kwargs) -> dict:
         async def emit(evt):
             if event_cb is not None:
                 try:
@@ -103,8 +108,11 @@ class BaseReActAgent:
                 except Exception:
                     pass
 
+        system_prompt = self.build_system(query, **kwargs) + CHITCHAT_GUIDANCE
+        # 会话记忆（D1）：历史在入口层脱敏/压缩后传入，插入 system 与当前 query 之间
         messages = [
-            {"role": "system", "content": self.build_system(query, **kwargs)},
+            {"role": "system", "content": system_prompt},
+            *[dict(m) for m in (history or [])],
             {"role": "user", "content": query},
         ]
         final: dict = {}
@@ -208,7 +216,9 @@ class BaseReActAgent:
         if not final:
             final = {"report": last_content or "（检索未完成，请人工介入）", "answer": last_content or "", "needs_human": True, "citations": []}
 
-        if "report" not in final or final.get("report") == (last_content or ""):
+        # 模板兜底仅适用于真实执行过工具轮次的任务型运行（D3）；闲聊/直答保持纯文本
+        used_tools = any(r.get("tool_calls") for r in self.trace.get("rounds", []))
+        if used_tools and ("report" not in final or final.get("report") == (last_content or "")):
             final["report"] = (
                 f"# 资料检索报告\n\n"
                 f"## 查询过程\n共执行 {len(self.trace.get('rounds', []))} 轮工具调用。\n\n"

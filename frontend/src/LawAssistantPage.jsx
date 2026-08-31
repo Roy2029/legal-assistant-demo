@@ -1,27 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import {
-  Button, Card, Collapse, Input, List, Modal, Radio, Select, Space, Tabs, Tag, Typography, message,
+  App as AntdApp, Button, Card, Collapse, Dropdown, Input, List, Modal, Radio, Select, Space, Tabs, Tag, Timeline, Tooltip, Typography, theme,
 } from 'antd'
-import { DeleteOutlined, EditOutlined, PlusOutlined, SendOutlined, StopOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, MoreOutlined, PlusOutlined, SendOutlined, StopOutlined } from '@ant-design/icons'
+import { Markdown } from './ui.jsx'
 
 const { Text, Paragraph } = Typography
-
-function Markdown({ content, style }) {
-  return (
-    <div style={style} className="md-body">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content || ''}</ReactMarkdown>
-    </div>
-  )
-}
 
 function ChunkList({ items, onOpenFull }) {
   if (!items || items.length === 0) return <Text type="secondary" style={{ fontSize: 12 }}>（无结果）</Text>
   return (
     <div>
       {items.map((c, i) => (
-        <Card key={i} size="small" style={{ marginBottom: 6 }} styles={{ body: { padding: 8 } }}>
+        <Card key={i} size="small" style={{ marginBottom: 8 }} styles={{ body: { padding: 12 } }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 4, flexWrap: 'wrap' }}>
             <Space size={4} wrap style={{ flex: 1, minWidth: 0 }}>
               <Text strong style={{ fontSize: 12 }}>#{i + 1}</Text>
@@ -56,6 +47,7 @@ function Feedback({ mode, action, sessionId, traceId, query, answer, trace }) {
   const [note, setNote] = useState('')
   const [sending, setSending] = useState(false)
   const [done, setDone] = useState(false)
+  const { message } = AntdApp.useApp()
 
   async function submit(r, n) {
     if (sending) return
@@ -110,6 +102,8 @@ function modeLabelOf(s) {
 }
 
 export default function LawAssistantPage() {
+  const { token } = theme.useToken()
+  const { message } = AntdApp.useApp()
   const [sessions, setSessions] = useState([])
   const [sessionId, setSessionId] = useState(null)
   const [messages, setMessages] = useState([])
@@ -131,8 +125,37 @@ export default function LawAssistantPage() {
   const [chunkModal, setChunkModal] = useState(null)
   const [fullChunk, setFullChunk] = useState(null)
   const abortRef = useRef(null)
+  const sessionIdRef = useRef(null)
 
   useEffect(() => { loadFolders(); loadSessions() }, [])
+
+  function applySession(sid) {
+    sessionIdRef.current = sid
+    setSessionId(sid)
+  }
+
+  // 会话视图状态全部清空（D4：trace/引用/反馈不得跨会话残留）
+  function clearSessionView() {
+    setTrace(null)
+    setCitations([])
+    setAgentSteps([])
+    setAgentTraceFull(null)
+    setFinalReport('')
+    setLastQuery('')
+    setLastAnswer('')
+    setTraceId(null)
+  }
+
+  // 切换会话：中止进行中的流 → 立即清空 → 守卫式加载目标会话数据
+  function switchSession(sid) {
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null }
+    setRunning(false)
+    applySession(sid)
+    setMessages([])
+    clearSessionView()
+    loadMessages(sid)
+    loadTraces(sid)
+  }
 
   async function loadFolders() {
     const r = await fetch('/api/kb/folders')
@@ -147,14 +170,10 @@ export default function LawAssistantPage() {
     })
     const d = await r.json()
     if (!d.ok) { message.error(d.error?.message || '创建会话失败'); return }
-    setSessionId(d.data.session_id)
+    applySession(d.data.session_id)
     setModeKey(mk)
     setMessages([])
-    setTrace(null)
-    setCitations([])
-    setAgentSteps([])
-    setAgentTraceFull(null)
-    setFinalReport('')
+    clearSessionView()
     await loadSessions()
   }
 
@@ -170,23 +189,28 @@ export default function LawAssistantPage() {
     setSessions(ss)
     const cur = ss.find((s) => s.session_id === sessionId) || ss[0]
     if (!sessionId || cur.session_id !== sessionId) {
-      setSessionId(cur.session_id)
+      switchSession(cur.session_id)
       setModeKey(modeKeyOf(cur))
-      loadMessages(cur.session_id)
-      loadTraces(cur.session_id)
     } else {
       setModeKey(modeKeyOf(cur))
     }
   }
 
   async function loadMessages(sid) {
-    const r = await fetch('/api/sessions/' + sid + '/messages')
-    const d = await r.json()
-    if (d.ok) setMessages((d.data || []).map((m) => ({ role: m.role, content: m.content })))
+    try {
+      const r = await fetch('/api/sessions/' + sid + '/messages')
+      const d = await r.json()
+      // 竞态守卫（D4）：响应到达时会话已切换则丢弃
+      if (d.ok && sessionIdRef.current === sid) {
+        setMessages((d.data || []).map((m) => ({ role: m.role, content: m.content })))
+      }
+    } catch (e) { /* ignore */ }
   }
 
   function applyAgentTrace(traceObj) {
-    if (!traceObj) { setAgentSteps([]); setAgentTraceFull(null); return }
+    // 空 trace（无工具轮次/无错误，如闲聊直答）不渲染，避免出现空「原始 trace JSON」残留
+    const hasContent = !!(traceObj && (((traceObj.rounds || []).length) || ((traceObj.errors || []).length)))
+    if (!hasContent) { setAgentSteps([]); setAgentTraceFull(null); return }
     setAgentTraceFull(traceObj)
     const steps = []
     const rounds = traceObj.rounds || []
@@ -208,7 +232,8 @@ export default function LawAssistantPage() {
     try {
       const r = await fetch('/api/sessions/' + sid + '/traces')
       const d = await r.json()
-      if (d.ok) {
+      // 竞态守卫（D4）：响应到达时会话已切换则丢弃
+      if (d.ok && sessionIdRef.current === sid) {
         const t = d.data || {}
         if (t.retrieval) setTrace(t.retrieval)
         if (t.agent) applyAgentTrace(t.agent)
@@ -232,9 +257,10 @@ export default function LawAssistantPage() {
   async function deleteSession() {
     if (!sessionId) return
     await fetch('/api/sessions/' + sessionId, { method: 'DELETE' })
+    sessionIdRef.current = null
     setSessionId(null)
     setMessages([])
-    setTrace(null); setCitations([]); setAgentSteps([]); setFinalReport('')
+    clearSessionView()
     await loadSessions()
   }
 
@@ -270,6 +296,7 @@ export default function LawAssistantPage() {
   }
 
   async function runChat(q) {
+    const sid = sessionIdRef.current
     const ctrl = new AbortController()
     abortRef.current = ctrl
     let assistant = ''
@@ -277,7 +304,7 @@ export default function LawAssistantPage() {
     try {
       const resp = await fetch('/api/chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q, session_id: sessionId, folders: folderFilter.length ? folderFilter : undefined }),
+        body: JSON.stringify({ query: q, session_id: sid, folders: folderFilter.length ? folderFilter : undefined }),
         signal: ctrl.signal,
       })
       const reader = resp.body.getReader()
@@ -286,6 +313,8 @@ export default function LawAssistantPage() {
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
+        // 会话已切换：中止读取，丢弃后续事件（D4）
+        if (sessionIdRef.current !== sid) { ctrl.abort(); break }
         buf += decoder.decode(value, { stream: true })
         const lines = buf.split('\n\n')
         buf = lines.pop() || ''
@@ -309,26 +338,32 @@ export default function LawAssistantPage() {
     } catch (e) {
       if (e.name !== 'AbortError') updateLastAssistant('⚠️ 请求失败: ' + e.message, false)
     } finally {
-      abortRef.current = null
-      setRunning(false)
-      loadMessages(sessionId)
+      if (abortRef.current === ctrl) abortRef.current = null
+      if (sessionIdRef.current === sid) {
+        setRunning(false)
+        loadMessages(sid)
+      }
     }
   }
 
   async function runAgent(q, mk) {
+    const sid = sessionIdRef.current
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
     const url = mk === 'case_analysis' ? '/api/assistant' : (mk === 'rag' ? '/api/rag-agent' : '/api/case-agent')
     const folders = folderFilter.length ? folderFilter : undefined
     const body = mk === 'case_analysis'
-      ? { action: 'case_analysis', query: q, session_id: sessionId, folders }
+      ? { action: 'case_analysis', query: q, session_id: sid, folders }
       : mk === 'rag'
-        ? { query: q, session_id: sessionId, folders }
-        : { query: q, session_id: sessionId }
+        ? { query: q, session_id: sid, folders }
+        : { query: q, session_id: sid }
     updateLastAssistant('执行中…', true)
     let finalText = ''
     try {
       const resp = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
+        signal: ctrl.signal,
       })
       const reader = resp.body.getReader()
       const decoder = new TextDecoder()
@@ -336,6 +371,8 @@ export default function LawAssistantPage() {
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
+        // 会话已切换：中止读取，丢弃后续事件（D4）
+        if (sessionIdRef.current !== sid) { ctrl.abort(); break }
         buf += decoder.decode(value, { stream: true })
         const lines = buf.split('\n\n')
         buf = lines.pop() || ''
@@ -364,10 +401,14 @@ export default function LawAssistantPage() {
         }
       }
     } catch (e) {
-      updateLastAssistant('⚠️ 请求失败: ' + e.message, false)
+      if (e.name !== 'AbortError') updateLastAssistant('⚠️ 请求失败: ' + e.message, false)
     } finally {
-      setRunning(false)
-      if (sessionId) { loadMessages(sessionId); loadSessions() }
+      if (abortRef.current === ctrl) abortRef.current = null
+      if (sessionIdRef.current === sid) {
+        setRunning(false)
+        loadMessages(sid)
+        loadSessions()
+      }
     }
   }
 
@@ -412,17 +453,16 @@ export default function LawAssistantPage() {
     <div>
       {!agentSteps.length && <Text type="secondary">智能分析 / 知识库助手 / 类案助手 执行后展示思考与工具 trace</Text>}
       {agentSteps.length > 0 && (
-        <List
-          size="small"
-          dataSource={agentSteps}
-          renderItem={(s, i) => (
-            <List.Item key={i} style={{ display: 'block' }}>
+        <Timeline
+          items={agentSteps.map((s) => ({
+            color: s.status === 'done' ? 'green' : s.status === 'tool' ? 'blue' : 'gray',
+            children: (
               <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12, lineHeight: 1.6 }}>
-                <Tag color={s.status === 'done' ? 'green' : 'blue'} style={{ marginRight: 6 }}>{s.status === 'done' ? '完成' : '进行中'}</Tag>
-                <Text style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12 }}>{(s.step || s.tool || '') + (s.summary ? '：' + s.summary : '')}</Text>
+                <Text strong style={{ fontSize: 12 }}>{s.step || s.tool || '步骤'}</Text>
+                {s.summary && <div style={{ color: token.colorTextSecondary, fontSize: 12 }}>{s.summary}</div>}
               </div>
-            </List.Item>
-          )}
+            ),
+          }))}
         />
       )}
       {finalReport && (
@@ -441,11 +481,11 @@ export default function LawAssistantPage() {
   )
 
   return (
-    <div style={{ display: 'flex', gap: 8, height: 'calc(100vh - 120px)' }}>
+    <div style={{ display: 'flex', gap: 16, height: '100%', minHeight: 0 }}>
       {/* 左：会话列表 */}
       <Card
         size="small"
-        style={{ width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column' }}
+        style={{ width: 280, flexShrink: 0, display: 'flex', flexDirection: 'column' }}
         styles={{ body: { flex: 1, overflow: 'auto', padding: 8 } }}
         title="会话列表"
         extra={<Button size="small" type="primary" icon={<PlusOutlined />} onClick={newSession}>新建会话</Button>}
@@ -456,35 +496,70 @@ export default function LawAssistantPage() {
           locale={{ emptyText: '暂无会话' }}
           renderItem={(s) => (
             <List.Item
-              style={{ cursor: 'pointer', background: s.session_id === sessionId ? '#e6f4ff' : undefined, padding: '6px 8px', borderRadius: 6, marginBottom: 2 }}
-              onClick={() => { setSessionId(s.session_id); setModeKey(modeKeyOf(s)); setMessages([]); loadMessages(s.session_id); setTrace(null); setCitations([]); setAgentSteps([]); setAgentTraceFull(null); setFinalReport(''); loadTraces(s.session_id) }}
-              actions={[
-                <Button key="rn" size="small" type="text" icon={<EditOutlined />} onClick={(e) => { e.stopPropagation(); setRenameText(s.title || ''); setRenameOpen(true) }} />,
-                <Button key="dl" size="small" type="text" danger icon={<DeleteOutlined />} onClick={(e) => { e.stopPropagation(); if (s.session_id === sessionId) deleteSession(); else { fetch('/api/sessions/' + s.session_id, { method: 'DELETE' }).then(loadSessions) } }} />,
-              ]}
+              className={`session-item ${s.session_id === sessionId ? 'active' : ''}`}
+              style={{ padding: '6px 8px', marginBottom: 2 }}
+              onClick={() => switchSession(s.session_id)}
             >
-              <Space direction="vertical" size={0} style={{ width: '100%' }}>
-                <Text style={{ fontSize: 13, wordBreak: 'break-all' }}>{s.title || s.session_id.slice(0, 8)}</Text>
-                <Tag color={s.mode === 'chat' ? 'green' : 'blue'} style={{ fontSize: 11 }}>{modeLabelOf(s)}</Tag>
-              </Space>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, width: '100%', minWidth: 0 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Tooltip title={s.title || s.session_id.slice(0, 8)} mouseEnterDelay={0.3}>
+                    <div className="truncate" style={{ fontSize: 13 }}>{s.title || s.session_id.slice(0, 8)}</div>
+                  </Tooltip>
+                  <Tag color={s.mode === 'chat' ? 'green' : 'blue'} style={{ fontSize: 11, marginInlineEnd: 0 }}>{modeLabelOf(s)}</Tag>
+                </div>
+                <Dropdown
+                  trigger={['click']}
+                  menu={{
+                    items: [
+                      { key: 'rename', icon: <EditOutlined />, label: '重命名' },
+                      { key: 'delete', icon: <DeleteOutlined />, danger: true, label: '删除' },
+                    ],
+                    onClick: ({ key, domEvent }) => {
+                      domEvent.stopPropagation()
+                      if (key === 'rename') { setRenameText(s.title || ''); setRenameOpen(true) }
+                      else if (key === 'delete') {
+                        if (s.session_id === sessionIdRef.current) deleteSession()
+                        else fetch('/api/sessions/' + s.session_id, { method: 'DELETE' }).then(loadSessions)
+                      }
+                    },
+                  }}
+                >
+                  <Button
+                    size="small"
+                    type="text"
+                    icon={<MoreOutlined />}
+                    className="actions"
+                    style={{ flexShrink: 0 }}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </Dropdown>
+              </div>
             </List.Item>
           )}
         />
       </Card>
 
       {/* 中：对话窗口 */}
-      <Card size="small" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }} styles={{ body: { flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', padding: 8 } }}>
-        <div style={{ flex: 1, overflow: 'auto', padding: 8 }}>
-          {messages.map((m, i) => (
-            <div key={i} style={{ marginBottom: 12, textAlign: m.role === 'user' ? 'right' : 'left' }}>
-              <Tag color={m.role === 'user' ? 'blue' : 'green'}>{m.role === 'user' ? '你' : '助手'}</Tag>
-              <div style={{ display: 'inline-block', maxWidth: '82%', textAlign: 'left', background: m.role === 'user' ? '#e6f7ff' : '#f6ffed', padding: '8px 12px', borderRadius: 8, verticalAlign: 'top' }}>
-                {m.role === 'assistant'
-                  ? <Markdown content={m.content || (m.pending ? '思考中...' : '')} style={{ whiteSpace: 'normal' }} />
-                  : <div style={{ whiteSpace: 'pre-wrap' }}>{m.content || ''}</div>}
+      <Card size="small" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }} styles={{ body: { flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', padding: 0 } }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: `1px solid ${token.colorBorderSecondary}`, flexWrap: 'wrap' }}>
+          <Text strong style={{ fontSize: 13 }}>模式</Text>
+          <Radio.Group size="small" value={modeKey} onChange={(e) => switchMode(e.target.value)} optionType="button" buttonStyle="solid" options={MODE_OPTIONS} />
+          <Text type="secondary" style={{ fontSize: 12 }}>切换模式将开启新会话</Text>
+        </div>
+        <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
+          {messages.map((m, i) => {
+            const isUser = m.role === 'user'
+            return (
+              <div key={i} className={`message-row ${isUser ? 'user' : 'assistant'}`}>
+                <div className="message-avatar">{isUser ? '我' : '法'}</div>
+                <div className="message-bubble">
+                  {m.role === 'assistant'
+                    ? <Markdown content={m.content || (m.pending ? '思考中…' : '')} style={{ whiteSpace: 'normal' }} />
+                    : <div style={{ whiteSpace: 'pre-wrap' }}>{m.content || ''}</div>}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
           {lastAnswer && !running && (
             <div style={{ padding: '0 8px 4px' }}>
               <Feedback mode={modeKey === 'chat' ? 'chat' : 'assistant'} action={modeKey === 'chat' ? '' : modeKey} sessionId={sessionId} traceId={traceId} query={lastQuery} answer={lastAnswer} trace={trace} />
@@ -492,7 +567,7 @@ export default function LawAssistantPage() {
           )}
         </div>
         {citations.length > 0 && (
-          <div style={{ padding: '4px 8px' }}>
+          <div style={{ padding: '8px 12px', borderTop: `1px solid ${token.colorBorderSecondary}` }}>
             <Text type="secondary" style={{ fontSize: 12 }}>引用法条（点击定位原文）：</Text>{' '}
             {citations.map((c, i) => (
               <Tag key={i} color="blue" style={{ cursor: 'pointer' }} onClick={async () => {
@@ -514,18 +589,7 @@ export default function LawAssistantPage() {
             {running ? <Button danger icon={<StopOutlined />} onClick={stop}>停止</Button> : <Button type="primary" icon={<SendOutlined />} onClick={send}>发送</Button>}
           </Space>
         </div>
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center', paddingTop: 6, flexWrap: 'wrap' }}>
-          <Text type="secondary" style={{ fontSize: 12, marginRight: 4 }}>模式：</Text>
-          <Radio.Group
-            size="small"
-            value={modeKey}
-            onChange={(e) => switchMode(e.target.value)}
-            optionType="button"
-            buttonStyle="solid"
-            options={MODE_OPTIONS}
-          />
-          <Text type="secondary" style={{ fontSize: 12 }}>切换模式将开启新会话（默认智能分析）</Text>
-        </div>
+        {`/* 模式选择已移至对话区顶部工具条 */`}
       </Card>
 
       {/* 右：trace 双 tab */}

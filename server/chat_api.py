@@ -62,6 +62,13 @@ DISCLAIMER = "\n\n---\n本回答由 AI 生成，不构成正式法律意见，�
 DISCLAIMER_TEXT = "本回答由 AI 生成，不构成正式法律意见，使用前须经执业律师核阅。"
 
 
+def _load_history_messages(session_id: str, limit: int = 20) -> list[dict]:
+    """加载会话历史（共享实现见 session_utils.load_history_messages）。"""
+    from .session_utils import load_history_messages
+
+    return load_history_messages(session_id, limit)
+
+
 def strip_disclaimer(text: str) -> str:
     """去掉 LLM 可能从历史中复制出来的免责声明，避免后端再追加一次导致重复。"""
     import re
@@ -140,23 +147,11 @@ async def event_gen(query: str, session_id: str, folders: list[str] | None = Non
         yield f"data: {json.dumps({'type': 'error', 'code': 'llm_not_configured', 'message': 'LLM 未配置，请在设置页填写 Base URL / API Key / Model'}, ensure_ascii=False)}\n\n"
         return
 
-    # 2. 生成（首次）
     # 2. 生成（首次）：注入会话历史（M1 会话管理，含上下文压缩）
-    history_messages = []
-    try:
-        from .db import get_engine
-        import sqlalchemy as sa
-        engine = get_engine()
-        with engine.begin() as conn:
-            rows = conn.execute(
-                sa.text("SELECT role, content FROM messages WHERE session_id=:s AND role IN ('user','assistant') AND msg_kind='final' ORDER BY id DESC LIMIT 20"),
-                {"s": session_id},
-            ).fetchall()
-        engine.dispose()
-        for role, content in reversed(rows):
-            history_messages.append({"role": role, "content": content})
-    except Exception:
-        pass
+    history_messages = _load_history_messages(session_id)
+    # 历史注入 LLM 前脱敏：历史是明文落库，须与当轮 query/context 同样打码，避免 PII 直达 LLM
+    from .desensitize import apply_to_text
+    history_messages = [{"role": m["role"], "content": apply_to_text(m["content"])} for m in history_messages]
     from .context_compressor import compress_history
     history_messages = compress_history(history_messages)
     messages = [

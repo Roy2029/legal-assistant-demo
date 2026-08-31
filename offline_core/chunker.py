@@ -1,6 +1,6 @@
 from typing import List
 
-from openai import BaseModel
+from pydantic import BaseModel
 from .data_model import Chunk, StructuredDocument, HeadingBlock, ParagraphBlock, CodeBlock, TableBlock, ImageBlock, ParentChildChunks
 from .manifest import compute_chunk_id
 from .modules import Chunker,log_module

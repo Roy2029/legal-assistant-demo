@@ -7,7 +7,7 @@ def estimate_tokens(text: str) -> int:
     return max(1, len(text) // 2)
 
 
-def compress_history(history: list[dict], max_tokens: int = 200_000, keep_recent: int = 5) -> list[dict]:
+def compress_history(history: list[dict], max_tokens: int = 128_000, keep_recent: int = 5) -> list[dict]:
     """返回压缩后的消息列表。超阈值时对最旧消息做摘要（M1 无 LLM 时截断）。"""
     if not history:
         return []

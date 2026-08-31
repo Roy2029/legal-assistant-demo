@@ -11,7 +11,8 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
 from .llm import llm_client
-from .session_utils import append_message, ensure_session
+from .session_utils import append_message, ensure_session, load_history_messages
+from .context_compressor import compress_history
 
 router = APIRouter(prefix="/api")
 
@@ -80,10 +81,12 @@ async def tool_case_retrieval(query: str) -> dict:
     from online_core.agents.case_agent import CaseAgent
     try:
         agent = CaseAgent(session_id="assistant-case")
-        result = await asyncio.wait_for(agent.search(fulltext_keyword=query, page_num=1, page_size=10), timeout=30)
+        result = await asyncio.wait_for(agent.search(keyword=query, page_size=10), timeout=60)
         if result.get("ok"):
-            return {"total": result.get("total", 0), "cases": result.get("documents", []), "note": "来自裁判文书检索 MCP"}
-        return {"total": 0, "cases": [], "note": f"MCP 检索失败：{result.get('error', '未知错误')}"}
+            data = result.get("data") or {}
+            cases = data.get("items", [])
+            return {"total": data.get("total", len(cases)), "cases": cases, "note": "来自裁判文书检索 MCP"}
+        return {"total": 0, "cases": [], "note": f"MCP 检索失败（{result.get('error_code', 'UNKNOWN')}）：{result.get('message') or result.get('error', '未知错误')}"}
     except asyncio.TimeoutError:
         return {"total": 0, "cases": [], "note": "裁判文书检索超时（30s），请稍后重试"}
     except Exception as e:
@@ -104,7 +107,14 @@ async def assistant_event_gen(action: str, query: str, session_id: str | None = 
     if skill is None:
         yield f"data: {json.dumps({'type': 'error', 'code': 'unknown_action', 'message': f'未找到业务动作 {action}'}, ensure_ascii=False)}\n\n"
         return
+    # 脱敏：LLM 可见的 query 入口脱敏（可逆假名化，D07），最终答案输出前还原
+    from .desensitize import apply_to_text, restore
+    masked_query = apply_to_text(query)
     session_id = ensure_session(session_id, mode="assistant", action=action, title=query[:20] or "新会话")
+    # 会话记忆（D1）：先取历史再落库当轮 user 消息；历史脱敏 + 128K 压缩
+    history = load_history_messages(session_id)
+    history = [{"role": m["role"], "content": apply_to_text(m["content"])} for m in history]
+    history = compress_history(history)
     append_message(session_id, "user", query, msg_kind="user")
     yield f"data: {json.dumps({'type': 'session_start', 'action': action, 'skill_id': skill['skill_id'], 'trace_id': trace_id, 'session_id': session_id}, ensure_ascii=False)}\n\n"
     tool_results = {}
@@ -113,7 +123,7 @@ async def assistant_event_gen(action: str, query: str, session_id: str | None = 
         tool = step.get("tool")
         if tool == "kb_retrieval":
             yield f"data: {json.dumps({'type': 'tool_call', 'tool': tool, 'params': {'query': query}}, ensure_ascii=False)}\n\n"
-            result = tool_kb_retrieval(query)
+            result = tool_kb_retrieval(masked_query)
             tool_results["kb"] = result
             yield f"data: {json.dumps({'type': 'tool_result', 'tool': tool, 'summary': '命中 ' + str(result['total']) + ' 条'}, ensure_ascii=False)}\n\n"
 
@@ -127,7 +137,7 @@ async def assistant_event_gen(action: str, query: str, session_id: str | None = 
             async def cb(evt):
                 await q.put(evt)
 
-            task = asyncio.create_task(agent.run(query, folders=folders, event_cb=cb))
+            task = asyncio.create_task(agent.run(masked_query, folders=folders, event_cb=cb, history=history))
             while not task.done() or not q.empty():
                 try:
                     evt = await asyncio.wait_for(q.get(), timeout=0.2)
@@ -146,16 +156,17 @@ async def assistant_event_gen(action: str, query: str, session_id: str | None = 
 
         elif tool == "case_retrieval":
             yield f"data: {json.dumps({'type': 'tool_call', 'tool': tool, 'params': {'query': query}}, ensure_ascii=False)}\n\n"
-            result = await tool_case_retrieval(query)
+            result = await tool_case_retrieval(masked_query)
             tool_results["case"] = result
             yield f"data: {json.dumps({'type': 'tool_result', 'tool': tool, 'summary': result.get('note', '0 条')}, ensure_ascii=False)}\n\n"
         else:
             # analyze / 其他步骤
-            summary = analyze_step(query, tool_results)
+            summary = analyze_step(masked_query, tool_results)
             yield f"data: {json.dumps({'type': 'step_end', 'step': step.get('id'), 'summary': summary}, ensure_ascii=False)}\n\n"
-    final_text = analyze_step(query, tool_results)
+    final_text = analyze_step(masked_query, tool_results)
     if tool_results.get("search_law") and tool_results["search_law"].get("answer"):
         final_text = tool_results["search_law"]["answer"]
+    final_text = restore(final_text)
     append_message(session_id, "assistant", final_text, msg_kind="final")
     yield f"data: {json.dumps({'type': 'final', 'answer': final_text, 'session_id': session_id}, ensure_ascii=False)}\n\n"
     yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"

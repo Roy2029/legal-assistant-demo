@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import {
-  Button, Card, Checkbox, Dropdown, Empty, Input, List, Modal, Radio, Select, Space, Tabs, Tag, Typography, message,
+  App as AntdApp, Button, Card, Checkbox, Dropdown, Empty, Input, List, Modal, Radio, Select, Space, Tabs, Tag, Tooltip, Typography, theme,
 } from 'antd'
 import {
   CommentOutlined, DeleteOutlined, EditOutlined, FileAddOutlined, FileTextOutlined,
   FolderOpenOutlined, LeftOutlined, RightOutlined, SafetyOutlined, ScanOutlined, SendOutlined, UploadOutlined,
 } from '@ant-design/icons'
+import { Markdown } from './ui.jsx'
 
 const { Text } = Typography
 
@@ -26,15 +25,9 @@ const MASK_METHODS = [
   { value: 'hash', label: '哈希值' },
 ]
 
-function Markdown({ content, style }) {
-  return (
-    <div style={style} className="md-body">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content || ''}</ReactMarkdown>
-    </div>
-  )
-}
-
 export default function ContractPage() {
+  const { token } = theme.useToken()
+  const { message } = AntdApp.useApp()
   const [contracts, setContracts] = useState([])
   const [selectedCid, setSelectedCid] = useState(null)
   const [selected, setSelected] = useState(null)
@@ -324,7 +317,7 @@ export default function ContractPage() {
     let pos = 0
     for (const [s, e, kind] of merged) {
       if (s > pos) out.push(text.slice(pos, s))
-      out.push(<mark key={s + ':' + e} style={{ background: kind === 'search' ? '#ffeb3b' : '#bae7ff', padding: '0 1px', borderRadius: 2 }}>{text.slice(s, e)}</mark>)
+      out.push(<mark key={s + ':' + e} style={{ background: kind === 'search' ? token.highlightSearch : token.highlightScan, color: token.colorText, padding: '0 1px', borderRadius: 2 }}>{text.slice(s, e)}</mark>)
       pos = e
     }
     if (pos < text.length) out.push(text.slice(pos))
@@ -455,7 +448,7 @@ export default function ContractPage() {
           <Button size="small" type="link" onClick={() => setSelectedScanIds([])}>全不选</Button>
         </Space>
       </div>
-      <div style={{ maxHeight: 160, overflow: 'auto', border: '1px solid #f0f0f0', padding: 6, borderRadius: 6 }}>
+      <div style={{ maxHeight: 160, overflow: 'auto', border: `1px solid ${token.colorBorderSecondary}`, padding: 6, borderRadius: 6 }}>
         {!scanItems.length && <Text type="secondary" style={{ fontSize: 12 }}>先选择单个脱敏项目，点击「扫描当前项目」得到候选列表</Text>}
         <Checkbox.Group value={selectedScanIds} onChange={setSelectedScanIds} style={{ width: '100%' }}>
           {scanItems.map((it) => (
@@ -474,7 +467,7 @@ export default function ContractPage() {
         <Text strong>待脱敏配置清单</Text>
         <Text type="secondary" style={{ fontSize: 12 }}>{configItems.length} 项</Text>
       </div>
-      <div style={{ maxHeight: 140, overflow: 'auto', border: '1px solid #f0f0f0', padding: 6, borderRadius: 6 }}>
+      <div style={{ maxHeight: 140, overflow: 'auto', border: `1px solid ${token.colorBorderSecondary}`, padding: 6, borderRadius: 6 }}>
         {!configItems.length && <Text type="secondary" style={{ fontSize: 12 }}>从候选列表勾选加入，或拖选原文片段加入</Text>}
         {configItems.map((it) => (
           <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginBottom: 2 }}>
@@ -488,7 +481,7 @@ export default function ContractPage() {
       </div>
       <Button type="primary" block loading={masking} onClick={confirmMask}>确认脱敏</Button>
       <Text strong>脱密映射配置</Text>
-      <div style={{ maxHeight: 160, overflow: 'auto', border: '1px solid #f0f0f0', padding: 6, borderRadius: 6 }}>
+      <div style={{ maxHeight: 160, overflow: 'auto', border: `1px solid ${token.colorBorderSecondary}`, padding: 6, borderRadius: 6 }}>
         {!mappingEntries.length && <Text type="secondary" style={{ fontSize: 12 }}>确认脱敏后生成映射配置</Text>}
         <Checkbox.Group value={selectedMapIds} onChange={setSelectedMapIds} style={{ width: '100%' }}>
           {mappingEntries.map((e) => (
@@ -504,14 +497,14 @@ export default function ContractPage() {
       </div>
       <Button block loading={restoring} onClick={restoreSelected} disabled={!selectedMapIds.length}>按选中脱密映射配置进行还原</Button>
       {restorePreview != null && (
-        <pre style={{ maxHeight: 200, overflow: 'auto', whiteSpace: 'pre-wrap', fontSize: 12, background: '#fafafa', padding: 6, borderRadius: 6 }}>{restorePreview}</pre>
+        <pre style={{ maxHeight: 200, overflow: 'auto', whiteSpace: 'pre-wrap', fontSize: 12, background: token.colorFillQuaternary, padding: 6, borderRadius: 6 }}>{restorePreview}</pre>
       )}
     </Space>
   )
 
   const reviewTab = (
     <Space direction="vertical" style={{ width: '100%' }} size={6}>
-      <div style={{ height: 280, overflow: 'auto', border: '1px solid #f0f0f0', padding: 8, borderRadius: 6, background: '#fafafa' }}>
+      <div style={{ height: 280, overflow: 'auto', border: `1px solid ${token.colorBorderSecondary}`, padding: 8, borderRadius: 6, background: token.colorFillQuaternary }}>
         {!chatMessages.length && <Text type="secondary" style={{ fontSize: 12 }}>向合同审查 agent 提问，例如：请审查这份施工合同并生成报告。</Text>}
         {chatMessages.map((m, i) => (
           <div key={i} style={{ marginBottom: 8 }}>
@@ -578,7 +571,7 @@ export default function ContractPage() {
   }
 
   return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'stretch', height: 'calc(100vh - 170px)' }}>
+    <div style={{ display: 'flex', gap: 16, alignItems: 'stretch', height: '100%', minHeight: 0 }}>
       {/* 左折叠按钮 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, justifyContent: 'flex-start' }}>
         <Button size="small" type="text" icon={leftCollapsed ? <RightOutlined /> : <LeftOutlined />} onClick={() => setLeftCollapsed(!leftCollapsed)} />
@@ -599,18 +592,20 @@ export default function ContractPage() {
               locale={{ emptyText: '暂无文档，点「添加」上传' }}
               renderItem={(c) => (
                 <List.Item
-                  style={{ cursor: 'pointer', background: c.contract_id === selectedCid ? '#e6f4ff' : undefined, padding: '6px 8px', borderRadius: 6, marginBottom: 2 }}
+                  style={{ cursor: 'pointer', background: c.contract_id === selectedCid ? token.colorPrimaryBg : undefined, padding: '6px 8px', borderRadius: 6, marginBottom: 2 }}
                   onClick={() => { setSelectedCid(c.contract_id); setSelected(c) }}
                   actions={[
                     <Button key="rn" size="small" type="text" icon={<EditOutlined />} onClick={(e) => { e.stopPropagation(); setRenameTarget(c); setRenameValue(c.original_name) }} />,
                     <Button key="dl" size="small" type="text" danger icon={<DeleteOutlined />} onClick={(e) => { e.stopPropagation(); removeContract(c) }} />,
                   ]}
                 >
-                  <Space direction="vertical" size={0} style={{ width: '100%' }}>
-                    <Text style={{ fontSize: 13, wordBreak: 'break-all' }}>{c.original_name}</Text>
-                    <Space size={4}>
+                  <Space direction="vertical" size={2} style={{ width: '100%', minWidth: 0 }}>
+                    <Tooltip title={c.original_name} mouseEnterDelay={0.3}>
+                      <div className="truncate" style={{ fontSize: 13 }}>{c.original_name}</div>
+                    </Tooltip>
+                    <Space size={4} wrap={false} style={{ maxWidth: '100%' }}>
                       <Tag color={c.status === 'reviewed' ? 'green' : c.status === 'masked' ? 'blue' : 'default'}>{c.status}</Tag>
-                      {c.risk_count > 0 && <Text type="secondary" style={{ fontSize: 12 }}>{c.risk_count} 处风险</Text>}
+                      {c.risk_count > 0 && <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{c.risk_count} 处风险</Text>}
                     </Space>
                   </Space>
                 </List.Item>
@@ -627,7 +622,7 @@ export default function ContractPage() {
           title={selected ? `预览：${selected.original_name}` : '请选择文档'}
           loading={previewLoading}
           style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
-          styles={{ body: { flex: 1, minHeight: 0, overflow: 'auto', padding: 8 } }}
+          styles={{ body: { flex: 1, minHeight: 0, overflow: 'auto', padding: 12 } }}
           extra={
             <Input
               size="small"

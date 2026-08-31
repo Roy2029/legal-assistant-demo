@@ -21,9 +21,12 @@ from .contract_api import router as contract_router
 
 app = FastAPI(title="法律助手 Demo", version="0.1.0")
 
+# 本地 demo：仅放行 127.0.0.1/localhost 任意端口（dev vite / prod uvicorn）。
+# 之前用 allow_origins=["http://127.0.0.1:*"] 是无效的——Starlette 只做精确匹配，
+# 端口通配永不命中；改用正则真正放行本地源并阻断其他来源。
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:*", "http://localhost:*"],
+    allow_origin_regex=r"https?://(127\.0\.0\.1|localhost)(:\d+)?",
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -84,13 +87,14 @@ def health():
 
 @app.get("/api/config")
 def get_config():
-    return {"ok": True, "data": config_service.load()}
+    # 只返回脱敏视图：明文密钥不离开服务端
+    return {"ok": True, "data": config_service.redacted()}
 
 
 @app.put("/api/config")
 def put_config(payload: dict):
     config_service.update(payload)
-    return {"ok": True, "data": config_service.load()}
+    return {"ok": True, "data": config_service.redacted()}
 
 
 # ── 生产打包：由 FastAPI 统一服务前端 dist（安装包不依赖 node/vite）──

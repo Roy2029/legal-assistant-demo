@@ -3,6 +3,7 @@
 # ── 离线处理 ──────────────────────────────────────────
 PyYAML>=6.0
 sentence-transformers>=2.2.0
+transformers<5           # transformers 5.x 有破坏性变更，钉住 4.x
 pypdf>=3.17.0
 pdfplumber>=0.10.0
 Pillow>=10.0.0
@@ -13,23 +14,31 @@ numpy>=1.24.0
 tqdm>=4.65.0
 jieba>=0.42.1
 
-# ── 旧依赖（标记为可选/废弃） ──────────────────────────
-# faiss-cpu>=1.7.4    # 已迁移至 Qdrant，保留仅用于兼容旧索引加载
-# rank-bm25>=0.2.2    # 已迁移至 Qdrant SparseVector，保留仅用于兼容
+# ── 旧依赖（可选，代码内有 try/except 兜底，缺失可降级，不装也能启动） ──
+# faiss-cpu>=1.7.4      # offline_core/store.py 旧 FAISS 兼容加载，已迁移至 Qdrant
+# rank-bm25>=0.2.2      # offline_core/store.py 旧 BM25 兼容路径，已迁移至 Qdrant SparseVector
+# scikit-learn>=1.3.0   # offline_core/pdf_parser.py 聚类辅助，缺失时跳过相应优化
 
-# ── 交互分析 ──────────────────────────────────────────
-streamlit>=1.28.0
-plotly>=5.18.0
-pandas>=2.0.0
+# ── Case Agent / 裁判文书 MCP（needed：适配器与 MCP 子进程同环境运行） ──
+mcp>=1.0.0                  # online_core/mcp/wenshu_adapter.py MCP 客户端
+playwright>=1.40            # MCP 子进程浏览器后端；安装后需执行 `playwright install chromium`
+ddddocr>=1.4                # MCP 子进程验证码识别（自动拉 onnxruntime，体积较大）
+pycryptodome>=3.19          # MCP 子进程站点加解密内核
 
 # ── Web 界面 ──────────────────────────────────────────
 fastapi>=0.115.0
 uvicorn>=0.30.0
 sse-starlette>=2.1.0
 jinja2>=3.1.0
-python-multipart>=0.0.12
+python-multipart>=0.0.18   # CVE-2024-53981（multipart 解析 DoS）修复版本
+PyMuPDF>=1.24.0            # contract_agent 读取 PDF 合同（import fitz）
+SQLAlchemy>=2.0            # server/db.py、audit、session、chat、contract 顶层硬导入
 httpx>=0.27.0
 python-dotenv>=1.0.0
 
 # ── Token 估算（可选） ──────────────────────────────────
 # deepseek-tokenizer>=0.2.0   # DeepSeek 精确 token 计数，未安装时自动降级为字符估算
+
+# ── 测试 ──────────────────────────────────────────────
+pytest>=8.0
+reportlab>=4.0              # test_kb_api_pdf 生成 PDF

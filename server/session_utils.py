@@ -80,6 +80,31 @@ def save_session_trace(session_id: str, trace_type: str, trace: dict) -> None:
         pass
 
 
+def load_history_messages(session_id: str, limit: int = 20) -> list[dict]:
+    """加载会话历史：user 行与 final 行都进入上下文（M1 会话管理 / D07）。
+
+    历史落库为明文，注入 LLM 前由调用方统一脱敏。chat 与 agent 入口共用。
+    """
+    history: list[dict] = []
+    try:
+        engine = get_engine()
+        with engine.begin() as conn:
+            rows = conn.execute(
+                sa.text(
+                    "SELECT role, content FROM messages WHERE session_id=:s "
+                    "AND role IN ('user','assistant') AND msg_kind IN ('user','final') "
+                    "ORDER BY id DESC LIMIT :n"
+                ),
+                {"s": session_id, "n": limit},
+            ).fetchall()
+        engine.dispose()
+        for role, content in reversed(rows):
+            history.append({"role": role, "content": content})
+    except Exception:
+        pass
+    return history
+
+
 def load_session_traces(session_id: str) -> dict:
     """读取会话的全部 trace，按 trace_type 返回 dict。"""
     import json

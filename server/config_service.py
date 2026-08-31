@@ -1,5 +1,10 @@
-"""配置服务：读取本地配置，支持热更新（SPEC §4.2 / D03）。"""
+"""配置服务：读取本地配置，支持热更新（SPEC §4.2 / D03）。
+
+敏感字段（llm.api_key / wenshu.password / retrieval.reranker_api_key）加密落盘、
+内存解密；对外提供 redacted() 脱敏视图，避免明文密钥经 /api/config 回传前端。
+"""
 import json
+import shutil
 import threading
 from pathlib import Path
 from typing import Any, Optional
@@ -7,6 +12,15 @@ from typing import Any, Optional
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = PROJECT_ROOT / "data" / "config.json"
 ENV_PATH = PROJECT_ROOT / ".env"
+
+_MASKED = "***"
+
+# 敏感字段声明：位置 → 字段名（redacted 脱敏、加密落盘、sentinel 剥离共用）
+SECRET_FIELDS = [
+    ("llm", "api_key"),
+    ("wenshu", "password"),
+    ("retrieval", "reranker_api_key"),
+]
 
 
 def _load_env_llm() -> dict[str, str]:
@@ -46,9 +60,48 @@ def _default_config() -> dict[str, Any]:
         },
     }
 
+
+def _encrypt_missing(cfg: dict[str, Any]) -> bool:
+    """把仍为明文的敏感字段加密到内存副本；返回是否有字段被加密（用于一次性迁移）。"""
+    from .crypto import encrypt_secret
+
+    changed = False
+    for section, field in SECRET_FIELDS:
+        sec = cfg.get(section) or {}
+        value = sec.get(field) or ""
+        if value and not value.startswith("enc:"):
+            sec[field] = encrypt_secret(value)
+            cfg[section] = sec
+            changed = True
+    return changed
+
+
+def _decrypt_all(cfg: dict[str, Any]) -> None:
+    """把敏感字段解密到内存（磁盘保持密文）。解密失败显式抛错，不静默返回密文。"""
+    from .crypto import decrypt_secret
+
+    for section, field in SECRET_FIELDS:
+        sec = cfg.get(section) or {}
+        value = sec.get(field) or ""
+        if value:
+            sec[field] = decrypt_secret(value)
+            cfg[section] = sec
+
+
+def _strip_sentinels(partial: dict[str, Any]) -> None:
+    """删除 partial 中等于空串/*** 的敏感字段，使 update 保留原值而非覆盖为 sentinel。"""
+    for section, field in SECRET_FIELDS:
+        sec = partial.get(section)
+        if isinstance(sec, dict) and sec.get(field) in (None, "", _MASKED):
+            sec.pop(field, None)
+            if not sec:
+                partial.pop(section, None)
+
+
 class ConfigService:
     def __init__(self) -> None:
-        self._lock = threading.Lock()
+        # RLock：update() 持锁后还会调 load()/save()，普通 Lock 会同线程二次加锁死锁
+        self._lock = threading.RLock()
         self._cache: Optional[dict[str, Any]] = None
 
     def load(self) -> dict[str, Any]:
@@ -62,15 +115,17 @@ class ConfigService:
                     cfg.update(loaded)
                 except Exception:
                     pass
-            # 敏感字段解密到内存，磁盘保持密文
-            try:
-                from .crypto import decrypt_secret
-                wenshu = cfg.get("wenshu") or {}
-                if wenshu.get("password"):
-                    wenshu["password"] = decrypt_secret(wenshu["password"])
-                cfg["wenshu"] = wenshu
-            except Exception:
-                pass
+                # 一次性迁移：旧明文密钥 → 加密落盘（迁移前备份，成功后回写）
+                try:
+                    if _encrypt_missing(cfg):
+                        bak = CONFIG_PATH.with_suffix(".json.bak")
+                        shutil.copyfile(CONFIG_PATH, bak)
+                        CONFIG_PATH.write_text(
+                            json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8"
+                        )
+                except Exception:
+                    pass
+            _decrypt_all(cfg)
             self._cache = cfg
             return cfg
 
@@ -79,26 +134,37 @@ class ConfigService:
             CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
             write_cfg = json.loads(json.dumps(cfg, ensure_ascii=False))
             try:
-                from .crypto import encrypt_secret
-                wenshu = write_cfg.get("wenshu") or {}
-                if wenshu.get("password"):
-                    wenshu["password"] = encrypt_secret(wenshu["password"])
-                write_cfg["wenshu"] = wenshu
+                _encrypt_missing(write_cfg)
             except Exception:
                 pass
             CONFIG_PATH.write_text(json.dumps(write_cfg, ensure_ascii=False, indent=2), encoding="utf-8")
             self._cache = cfg
 
     def update(self, partial: dict[str, Any]) -> dict[str, Any]:
+        with self._lock:
+            cfg = self.load()
+            _strip_sentinels(partial)
+            cfg.update(partial)
+            self.save(cfg)
+            return cfg
+
+    def redacted(self) -> dict[str, Any]:
+        """脱敏视图：敏感字段替换为 ***，并附加 *_set 布尔标记。供 /api/config 返回。"""
         cfg = self.load()
-        cfg.update(partial)
-        self.save(cfg)
-        return cfg
+        c = json.loads(json.dumps(cfg, ensure_ascii=False))
+        for section, field in SECRET_FIELDS:
+            sec = c.get(section) or {}
+            value = sec.get(field) or ""
+            sec[field] = _MASKED
+            sec[f"{field}_set"] = bool(value)
+            c[section] = sec
+        return c
 
     def get_llm(self) -> dict[str, Any]:
         return self.load().get("llm", {})
 
     def get_wenshu(self) -> dict[str, Any]:
         return self.load().get("wenshu", {})
+
 
 config_service = ConfigService()

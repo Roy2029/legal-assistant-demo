@@ -6,8 +6,10 @@ import json
 import shutil
 import uuid
 from pathlib import Path
+from typing import Annotated
 
 from fastapi import APIRouter, File, UploadFile
+from fastapi import Path as FPath
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 from .db import get_engine
@@ -29,6 +31,10 @@ BUILTIN_RULES = PROJECT_ROOT / "skills" / "contract_review" / "rules.jsonl"
 
 SUPPORTED = {".docx", ".pdf", ".txt", ".md"}
 router = APIRouter(prefix="/api/contracts")
+
+# contract_id 由 uuid.uuid4().hex 生成（32 位 hex）。严格格式校验从源头阻断
+# URL 编码的路径穿越（..%5C..），非法值由 FastAPI 直接返回 422。
+ContractId = Annotated[str, FPath(pattern=r"^[0-9a-f]{32}$")]
 
 
 def _cid_dir(cid: str) -> Path:
@@ -59,7 +65,7 @@ def _mask_state_path(cid: str) -> Path:
     return MASK_STATE_ROOT / f"{cid}.json"
 
 
-def _insert_contract(contract_id: str, original_name: str, file_type: str, redacted_path: str, mapping_path: str, status: str = "uploaded"):
+def _insert_contract(contract_id: ContractId, original_name: str, file_type: str, redacted_path: str, mapping_path: str, status: str = "uploaded"):
     engine = get_engine()
     with engine.begin() as conn:
         conn.execute(sa.text(
@@ -69,7 +75,7 @@ def _insert_contract(contract_id: str, original_name: str, file_type: str, redac
     engine.dispose()
 
 
-def _update_contract(contract_id: str, **fields):
+def _update_contract(contract_id: ContractId, **fields):
     if not fields:
         return
     sets = ", ".join(f"{k}=:{k}" for k in fields)
@@ -79,7 +85,7 @@ def _update_contract(contract_id: str, **fields):
     engine.dispose()
 
 
-def _get_contract(contract_id: str):
+def _get_contract(contract_id: ContractId):
     engine = get_engine()
     with engine.begin() as conn:
         row = conn.execute(sa.text(
@@ -287,7 +293,7 @@ def list_contracts():
 
 
 @router.put("/{contract_id}")
-def rename_contract(contract_id: str, payload: dict):
+def rename_contract(contract_id: ContractId, payload: dict):
     name = (payload.get("original_name") or "").strip()
     if not name:
         return JSONResponse({"ok": False, "error": {"code": "empty_name", "message": "名称不能为空"}}, status_code=400)
@@ -299,7 +305,7 @@ def rename_contract(contract_id: str, payload: dict):
 
 
 @router.delete("/{contract_id}")
-def delete_contract(contract_id: str):
+def delete_contract(contract_id: ContractId):
     row = _get_contract(contract_id)
     engine = get_engine()
     with engine.begin() as conn:
@@ -388,20 +394,20 @@ async def upload_skill(
 
 
 @router.get("/{contract_id}/files")
-def list_contract_files(contract_id: str):
+def list_contract_files(contract_id: ContractId):
     files = [p.name for p in _list_redacted_files(contract_id)]
     return {"ok": True, "data": files}
 
 
 @router.get("/{contract_id}/versions")
-def list_versions(contract_id: str):
+def list_versions(contract_id: ContractId):
     if not _get_contract(contract_id):
         return JSONResponse({"ok": False, "error": {"code": "not_found", "message": "合同不存在"}}, status_code=404)
     return {"ok": True, "data": _classify_versions(contract_id)}
 
 
 @router.get("/{contract_id}/content")
-def get_contract_content(contract_id: str, file: str, kind: str = "redacted"):
+def get_contract_content(contract_id: ContractId, file: str, kind: str = "redacted"):
     """读取版本内容。kind: original/redacted/masked/edited/annotated/report/restored。"""
     if not _get_contract(contract_id):
         return JSONResponse({"ok": False, "error": {"code": "not_found", "message": "合同不存在"}}, status_code=404)
@@ -412,7 +418,7 @@ def get_contract_content(contract_id: str, file: str, kind: str = "redacted"):
 
 
 @router.put("/{contract_id}/content")
-async def update_contract_content(contract_id: str, payload: dict):
+async def update_contract_content(contract_id: ContractId, payload: dict):
     """把编辑后的文本保存为工作区内的 Markdown 文件。"""
     file = (payload.get("file") or "").strip()
     content = payload.get("content") or ""
@@ -432,7 +438,7 @@ async def update_contract_content(contract_id: str, payload: dict):
 # ---------------------------------------------------------------------------
 
 @router.get("/{contract_id}/scan")
-def scan_contract_pii(contract_id: str, file: str | None = None, categories: str | None = None):
+def scan_contract_pii(contract_id: ContractId, file: str | None = None, categories: str | None = None):
     """扫描原件中的敏感信息，返回可勾选清单。"""
     if not _get_contract(contract_id):
         return JSONResponse({"ok": False, "error": {"code": "not_found", "message": "合同不存在"}}, status_code=404)
@@ -453,7 +459,7 @@ def scan_contract_pii(contract_id: str, file: str | None = None, categories: str
 
 
 @router.post("/{contract_id}/mask")
-def confirm_mask(contract_id: str, payload: dict):
+def confirm_mask(contract_id: ContractId, payload: dict):
     """按用户配置执行脱敏，生成脱敏版并保存脱密映射配置。"""
     if not _get_contract(contract_id):
         return JSONResponse({"ok": False, "error": {"code": "not_found", "message": "合同不存在"}}, status_code=404)
@@ -498,13 +504,13 @@ def confirm_mask(contract_id: str, payload: dict):
 
 
 @router.get("/{contract_id}/mask/mapping")
-def get_mask_mapping(contract_id: str):
+def get_mask_mapping(contract_id: ContractId):
     entries = _load_mask_mapping(contract_id)
     return {"ok": True, "data": {"entries": entries}}
 
 
 @router.post("/{contract_id}/mask/manual")
-def add_manual_mask_item(contract_id: str, payload: dict):
+def add_manual_mask_item(contract_id: ContractId, payload: dict):
     """把用户在预览中拖选的原文片段加入脱敏清单。"""
     text = (payload.get("text") or "").strip()
     category = payload.get("category") or "manual"
@@ -521,13 +527,13 @@ def add_manual_mask_item(contract_id: str, payload: dict):
 
 
 @router.get("/{contract_id}/mask/manual")
-def list_manual_mask_items(contract_id: str):
+def list_manual_mask_items(contract_id: ContractId):
     state = _read_json(_mask_state_path(contract_id))
     return {"ok": True, "data": state.get("pending_manual", [])}
 
 
 @router.delete("/{contract_id}/mask/manual/{item_id}")
-def delete_manual_mask_item(contract_id: str, item_id: str):
+def delete_manual_mask_item(contract_id: ContractId, item_id: str):
     state = _read_json(_mask_state_path(contract_id))
     pending = state.get("pending_manual", [])
     state["pending_manual"] = [x for x in pending if x.get("id") != item_id]
@@ -536,7 +542,7 @@ def delete_manual_mask_item(contract_id: str, item_id: str):
 
 
 @router.post("/{contract_id}/mask/restore")
-def restore_selected_mapping(contract_id: str, payload: dict):
+def restore_selected_mapping(contract_id: ContractId, payload: dict):
     """按选中的脱密映射配置进行还原，还原结果保存在 agent 工作区之外。"""
     file = (payload.get("file") or "").strip()
     entries = payload.get("entries") or []
@@ -583,7 +589,7 @@ def _run_rule_review(cid: str) -> dict:
 
 
 @router.post("/{contract_id}/review")
-def review_contract(contract_id: str):
+def review_contract(contract_id: ContractId):
     if not _get_contract(contract_id):
         return JSONResponse({"ok": False, "error": {"code": "not_found", "message": "合同不存在"}}, status_code=404)
     result = _run_rule_review(contract_id)
@@ -593,7 +599,7 @@ def review_contract(contract_id: str):
 
 
 @router.get("/{contract_id}/report")
-def get_report(contract_id: str):
+def get_report(contract_id: ContractId):
     row = _get_contract(contract_id)
     if not row or not row.get("report_path") or not Path(row["report_path"]).exists():
         return JSONResponse({"ok": False, "error": {"code": "no_report", "message": "报告不存在，请先审查"}}, status_code=404)
@@ -601,7 +607,7 @@ def get_report(contract_id: str):
 
 
 @router.get("/{contract_id}/download")
-def download_contract(contract_id: str, kind: str = "redacted", file: str | None = None):
+def download_contract(contract_id: ContractId, kind: str = "redacted", file: str | None = None):
     row = _get_contract(contract_id)
     if not row:
         return JSONResponse({"ok": False, "error": {"code": "not_found", "message": "合同不存在"}}, status_code=404)
@@ -690,7 +696,7 @@ def download_contract(contract_id: str, kind: str = "redacted", file: str | None
 # ---------------------------------------------------------------------------
 
 @router.post("/{contract_id}/agent-review")
-async def agent_review_contract(contract_id: str):
+async def agent_review_contract(contract_id: ContractId):
     """LLM 驱动的合同审查 agent（ReAct）。未配置 LLM 时回退规则引擎。"""
     if not _get_contract(contract_id):
         return JSONResponse({"ok": False, "error": {"code": "not_found", "message": "合同不存在"}}, status_code=404)
@@ -720,7 +726,7 @@ async def agent_review_contract(contract_id: str):
 
 
 @router.post("/{contract_id}/agent-chat")
-async def contract_agent_chat(contract_id: str, payload: dict):
+async def contract_agent_chat(contract_id: ContractId, payload: dict):
     """审查 tab 的 ReAct agent chat：流式 SSE，自动附带当前脱敏文件与规则库文件引用。"""
     query = (payload.get("query") or "").strip()
     if not query:
@@ -728,6 +734,9 @@ async def contract_agent_chat(contract_id: str, payload: dict):
     if not _get_contract(contract_id):
         return JSONResponse({"ok": False, "error": {"code": "not_found", "message": "合同不存在"}}, status_code=404)
 
+    # 脱敏：LLM 可见的 query 入口脱敏（可逆假名化，D07），最终答案输出前还原
+    from .desensitize import apply_to_text, restore
+    masked_query = apply_to_text(query)
     current_file = payload.get("file") or ""
     rule_files = payload.get("rule_files") or []
     session_id = ensure_session(payload.get("session_id"), mode="contract_review", action=contract_id, title=query[:20] or "合同审查会话")
@@ -737,6 +746,12 @@ async def contract_agent_chat(contract_id: str, payload: dict):
     if rule_files:
         refs.append(f"规则库：{', '.join(rule_files)}")
     user_text = query if not refs else query + "（" + "；".join(refs) + "）"
+    # 会话记忆（D1）：先取历史再落库当轮 user 消息；历史脱敏 + 128K 压缩
+    from .session_utils import load_history_messages
+    from .context_compressor import compress_history
+    history = load_history_messages(session_id)
+    history = [{"role": m["role"], "content": apply_to_text(m["content"])} for m in history]
+    history = compress_history(history)
     append_message(session_id, "user", user_text, msg_kind="user")
 
     async def event_gen():
@@ -756,7 +771,7 @@ async def contract_agent_chat(contract_id: str, payload: dict):
         async def cb(evt):
             await q.put(evt)
 
-        task = asyncio.create_task(agent.run(query, event_cb=cb))
+        task = asyncio.create_task(agent.run(masked_query, event_cb=cb, history=history))
         while not task.done() or not q.empty():
             try:
                 evt = await asyncio.wait_for(q.get(), timeout=0.2)
@@ -771,8 +786,8 @@ async def contract_agent_chat(contract_id: str, payload: dict):
             yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
             return
 
-        report = result.get("report", "") if result.get("ok") else result.get("report", "")
-        answer = result.get("answer", "")
+        report = restore(result.get("report", "") if result.get("ok") else result.get("report", ""))
+        answer = restore(result.get("answer", ""))
         risks = result.get("risks") or []
 
         if result.get("ok"):

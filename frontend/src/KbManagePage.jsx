@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  Button, Card, Checkbox, Input, List, Modal, Select, Space, Tag, Typography, message,
+  App as AntdApp, Button, Card, Checkbox, Input, List, Modal, Select, Space, Tag, Tooltip, Typography, theme,
 } from 'antd'
 import { DeleteOutlined, EditOutlined, FolderOpenOutlined, UploadOutlined } from '@ant-design/icons'
 
@@ -12,6 +12,8 @@ function displayFileName(filePath) {
 }
 
 export default function KbManagePage() {
+  const { token } = theme.useToken()
+  const { message } = AntdApp.useApp()
   const [docs, setDocs] = useState([])
   const [folders, setFolders] = useState([])
   const [folder, setFolder] = useState('default')
@@ -228,7 +230,7 @@ export default function KbManagePage() {
   const docsInFolder = (kbId) => docs.filter((d) => (d.kb_id || 'default') === kbId)
 
   return (
-    <div style={{ display: 'flex', gap: 8, height: 'calc(100vh - 120px)' }}>
+    <div style={{ display: 'flex', gap: 16, height: '100%', minHeight: 0 }}>
       {/* 左：文件目录树 */}
       <Card size="small" style={{ width: 360, flexShrink: 0, display: 'flex', flexDirection: 'column' }} styles={{ body: { flex: 1, overflow: 'auto', padding: 8 } }}
         title="文件目录树"
@@ -251,42 +253,50 @@ export default function KbManagePage() {
             return (
               <div key={f.kb_id}>
                 <div
+                  className="tree-row"
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={() => dropOnFolder(f.kb_id)}
                   onClick={() => { setExpandedFolders((prev) => ({ ...prev, [f.kb_id]: !expanded })); setFolder(f.kb_id) }}
-                  style={{ border: dragDocId ? '1px dashed #1677ff' : '1px solid #f0f0f0', borderRadius: 6, padding: '6px 8px', background: dragDocId ? '#f0f5ff' : folder === f.kb_id ? '#fff7e6' : '#fafafa', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: 2 }}
+                  style={{ border: dragDocId ? `1px dashed ${token.colorPrimary}` : `1px solid ${token.colorBorderSecondary}`, borderRadius: 6, padding: '6px 8px', background: dragDocId ? token.colorPrimaryBg : folder === f.kb_id ? token.colorPrimaryBg : token.colorFillQuaternary, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4, cursor: 'pointer', marginBottom: 2 }}
                 >
-                  <Space size={4}>
-                    <span style={{ color: '#999', fontSize: 12 }}>{expanded ? '▾' : '▸'}</span>
-                    <FolderOpenOutlined style={{ color: '#faad14' }} />
-                    <Text strong style={{ fontSize: 13 }}>{f.name}</Text>
-                    <Tag>{folderDocs.length} 篇</Tag>
-                  </Space>
-                  <Space size={4} onClick={(e) => e.stopPropagation()}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, flex: 1 }}>
+                    <span style={{ color: token.colorTextTertiary, fontSize: 12, flexShrink: 0 }}>{expanded ? '▾' : '▸'}</span>
+                    <FolderOpenOutlined style={{ color: token.colorWarning, flexShrink: 0 }} />
+                    <Tooltip title={f.name} mouseEnterDelay={0.3}>
+                      <span className="truncate" style={{ fontSize: 13, flex: 1, minWidth: 0 }}>{f.name}</span>
+                    </Tooltip>
+                    <Tag style={{ flexShrink: 0, marginInlineEnd: 0 }}>{folderDocs.length} 篇</Tag>
+                  </div>
+                  <div className="row-actions" onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 2 }}>
                     <Button size="small" type="text" icon={<EditOutlined />} onClick={() => { setRenamingFolder(f); setRenameText(f.name) }} />
                     <Button size="small" type="text" danger icon={<DeleteOutlined />} disabled={f.kb_id === 'default'} onClick={() => deleteFolder(f)} />
-                  </Space>
+                  </div>
                 </div>
                 {expanded && (
-                  <div style={{ marginLeft: 18, borderLeft: '1px dashed #d9d9d9', paddingLeft: 8 }}>
+                  <div style={{ marginLeft: 18, borderLeft: `1px dashed ${token.colorBorderSecondary}`, paddingLeft: 8 }}>
                     {folderDocs.length === 0 && <Text type="secondary" style={{ fontSize: 12 }}>（空）</Text>}
                     {folderDocs.map((d) => (
                       <div key={d.doc_id}
+                        className="tree-row"
                         draggable
                         onDragStart={() => setDragDocId(d.doc_id)}
                         onDragEnd={() => setDragDocId(null)}
                         onClick={() => viewChunks(d.doc_id)}
-                        style={{ cursor: 'grab', background: d.doc_id === selectedDocId ? '#e6f4ff' : undefined, padding: '4px 8px', borderRadius: 6, marginBottom: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                        style={{ cursor: 'grab', background: d.doc_id === selectedDocId ? token.colorPrimaryBg : undefined, padding: '4px 8px', borderRadius: 6, marginBottom: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}
                       >
-                        <Space size={4}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, flex: 1 }}>
                           <Checkbox checked={selectedIds.includes(d.doc_id)} onClick={(e) => e.stopPropagation()} onChange={(e) => setSelectedIds((prev) => e.target.checked ? [...prev, d.doc_id] : prev.filter((x) => x !== d.doc_id))} />
-                          <Text style={{ fontSize: 13, wordBreak: 'break-all' }}>{displayFileName(d.file_path)}</Text>
-                        </Space>
-                        <Space size={4}>
-                          <Tag>{d.parse_status}</Tag>
-                          <Text type="secondary" style={{ fontSize: 12 }}>{d.chunk_count} chunks</Text>
-                          <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={(e) => { e.stopPropagation(); removeDoc(d.doc_id) }} />
-                        </Space>
+                          <Tooltip title={displayFileName(d.file_path)} mouseEnterDelay={0.3}>
+                            <span className="truncate" style={{ fontSize: 13, flex: 1, minWidth: 0 }}>{displayFileName(d.file_path)}</span>
+                          </Tooltip>
+                        </div>
+                        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Tag style={{ marginInlineEnd: 0 }}>{d.parse_status}</Tag>
+                          <Tag style={{ marginInlineEnd: 0 }}>{d.chunk_count} chunks</Tag>
+                          <div className="row-actions" style={{ display: 'flex', alignItems: 'center' }}>
+                            <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={(e) => { e.stopPropagation(); removeDoc(d.doc_id) }} />
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -312,7 +322,7 @@ export default function KbManagePage() {
         {!selectedDocId && <Text type="secondary">未选中文档，点击左侧文档查看切块</Text>}
         {selectedDocId && chunks.length === 0 && <Text type="secondary">（无分块）</Text>}
         {selectedDocId && chunks.map((c, i) => (
-          <Card key={c.chunk_id} size="small" style={{ marginBottom: 8 }} title={
+          <Card key={c.chunk_id} size="small" style={{ marginBottom: 12 }} title={
             <Space size={4} wrap>
               <Text strong style={{ fontSize: 12 }}>#{i + 1}</Text>
               <Tag>{c.chunk_level}</Tag>
