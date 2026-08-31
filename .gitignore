@@ -46,3 +46,16 @@ data/agent_workspace/
 data/tmp_selection/
 data/测试文件/
 
+# 开发/测试/文档目录（本地维护，不入库）
+docs/
+openspec/
+tests/
+scripts/
+pytest.ini
+backup/
+
+# 本地工具与临时文件（不入库）
+.claude/
+.codex/
+.playwright-mcp/
+
