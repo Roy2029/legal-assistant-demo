@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.3.1（2026-08-31）- WenshuMCP 随包分发 + per-user 安装
+
+- **WenshuMCP 内置**：`vendor/wenshumcp/`（wenshu_mcp + wenshu_api，1.5M 纯 Python）随包分发，Case Agent 不再依赖外部工作副本；项目位置解析顺序 `WENSHU_MCP_PROJECT` → vendor → 开发机副本（`online_core/mcp/wenshu_adapter.py`），初始化日志带 vendor 指纹
+- **版本追踪**：`packaging/vendor_wenshumcp.py` 一键同步（源目录非 git 仓库，以包内容 sha256 指纹为准，元文件不参与）；`VENDOR.json` 记录来源与指纹
+- **page_id 轮换对策**：`WENSHU_ALGO_CONFIG` 环境变量可指向替换文件（优先级高于出厂值），站点轮换无需重装/重打包
+- **安装形态**：per-user 安装至 `{localappdata}\LegalAssistantDemo`（`PrivilegesRequired=lowest`）——主应用 PROJECT_ROOT 相对定位要求安装目录整体可写，放弃 Program Files；会话快照落 `~/.wenshu/`（天然可写、重装不丢）
+- `packaging/output/` 入 .gitignore；0.2.0 exe（247MB LFS）移出版本控制
+
 ## 2026-08-31 - Case Agent 接入 WenshuMCP 新版 MCP
 
 - 适配器（`online_core/mcp/wenshu_adapter.py`）：项目路径迁移 `D:/个人开发/裁判文书检索MCP` → `C:/Users/Roy/WorkBuddy/WenshuMCP`（可 `WENSHU_MCP_PROJECT`/`WENSHU_MCP_PYTHON` 覆盖）；MCP 子进程默认解释器改用 WenshuMCP 官方托管环境 `~/.workbuddy/binaries/python/envs/default`（缺失回退当前解释器）；入口改 `python -m wenshu_mcp.server`；支持向 MCP 子进程注入环境变量（凭据经 `WenshuMCPConfig.env`，来源设置页加密配置，不落盘）；解析 MCP 统一 JSON 返回 `{ok, error_code, data|message}` 并透传 `error_code`/`data`
