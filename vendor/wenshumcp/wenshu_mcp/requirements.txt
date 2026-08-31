@@ -1,0 +1,9 @@
+# 裁判文书 MCP 工具依赖（纯 pip 可装）
+requests
+pycryptodome
+python-dotenv
+ddddocr            # 验证码识别（自动拉 onnxruntime，体积较大）
+reportlab          # PDF 兜底（纯 Python 中文字体）
+python-docx        # DOCX 输出（纯 Python，跨平台）
+playwright         # 浏览器后端（pip 部分；浏览器二进制需 `playwright install chromium`）
+mcp                # MCP Python SDK

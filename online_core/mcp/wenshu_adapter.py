@@ -1,6 +1,6 @@
 """裁判文书检索 MCP 适配器（D09 §9）。
 
-通过 stdio 启动 `C:/Users/Roy/WorkBuddy/WenshuMCP` 的 FastMCP server 并调用工具。
+通过 stdio 启动 WenshuMCP 的 FastMCP server 并调用工具（项目位置解析见下方 MCP_PROJECT）。
 MCP 不可用时返回结构化错误，不抛异常。
 
 新版 MCP（2026-08 迭代）入口为 ``python -m wenshu_mcp.server``，工具返回统一
@@ -14,18 +14,48 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
-# MCP 项目位置：打包/换机部署时用 WENSHU_MCP_PROJECT 指向随包分发的 WenshuMCP 目录
-MCP_PROJECT = Path(os.getenv("WENSHU_MCP_PROJECT", "C:/Users/Roy/WorkBuddy/WenshuMCP"))
+logger = logging.getLogger(__name__)
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+# MCP 项目位置解析顺序（首个含 wenshu_mcp/server.py 的生效）：
+# 1) WENSHU_MCP_PROJECT 环境变量（换机/多版本调试）
+# 2) 仓库/安装目录内 vendor/wenshumcp（随包分发形态，scripts/vendor_wenshumcp.py 维护）
+# 3) 开发机 WenshuMCP 工作副本（历史默认路径，兼容本地开发环境）
+_MCP_PROJECT_CANDIDATES = (
+    _REPO_ROOT / "vendor" / "wenshumcp",
+    Path("C:/Users/Roy/WorkBuddy/WenshuMCP"),
+)
+MCP_PROJECT = Path(
+    os.getenv("WENSHU_MCP_PROJECT")
+    or next(
+        (str(p) for p in _MCP_PROJECT_CANDIDATES if (p / "wenshu_mcp" / "server.py").exists()),
+        str(_MCP_PROJECT_CANDIDATES[-1]),
+    )
+)
 # MCP 子进程解释器：默认与应用同环境（打包后即随包解释器），要求该环境具备
 # wenshu_mcp 的依赖（mcp / playwright+chromium / ddddocr / pycryptodome / python-docx）。
-# 开发机如需指定专用解释器（如 WorkBuddy 托管环境），设 WENSHU_MCP_PYTHON 即可。
+# 开发机如需指定专用解释器，设 WENSHU_MCP_PYTHON 即可。
 MCP_PYTHON = Path(os.getenv("WENSHU_MCP_PYTHON", sys.executable))
+
+# 随包 vendor 版本信息（vendor/wenshumcp/VENDOR.json），用于排障追溯
+try:
+    _VENDOR_META = json.loads(
+        (_REPO_ROOT / "vendor" / "wenshumcp" / "VENDOR.json").read_text(encoding="utf-8")
+    )
+    VENDOR_INFO: Optional[dict] = {
+        "vendored_at": _VENDOR_META.get("vendored_at"),
+        "fingerprint": (_VENDOR_META.get("content_fingerprint") or "")[:12],
+    }
+except Exception:
+    VENDOR_INFO = None
 
 
 @dataclass
@@ -48,6 +78,10 @@ class WenshuMCPAdapter:
     def __init__(self, config: Optional[WenshuMCPConfig] = None):
         self.config = config or WenshuMCPConfig()
         self._inflight: set[asyncio.Task] = set()
+        logger.info(
+            "WenshuMCP 适配器初始化：project=%s python=%s vendor=%s",
+            self.config.project, self.config.python, VENDOR_INFO or "无随包信息",
+        )
 
     def available(self) -> bool:
         return (

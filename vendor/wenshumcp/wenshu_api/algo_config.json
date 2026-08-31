@@ -1,0 +1,23 @@
+{
+  "_comment": "易随站点改版的协议参数集中在此。站点小改版时，只需替换本文件（或设置环境变量 WENSHU_ALGO_CONFIG 指向新文件）即可热更新，无需重装。所有字段均可缺省——缺省时回退到 constants.py 的硬编码默认值。",
+  "page_id": "3a8d444325cd591da840af0f701b52fa",
+  "search_cfg": "com.lawyee.judge.dc.parse.dto.SearchDataDsoDTO@queryDoc",
+  "search_cfg_count": "com.lawyee.judge.dc.parse.dto.SearchDataDsoDTO@wsCountSearch",
+  "search_cfg_left": "com.lawyee.judge.dc.parse.dto.SearchDataDsoDTO@leftDataItem",
+  "search_cfg_tip": "com.lawyee.judge.dc.parse.dto.SearchDataDsoDTO@smartTipSearch",
+  "doc_info_cfg": "com.lawyee.judge.dc.parse.dto.SearchDataDsoDTO@docInfoSearch",
+  "search_app_path": "181217BMTKHNT2W0",
+  "detail_app_path": "181107ANFZ0BXSK4",
+  "field_keys": {
+    "keyword": "s21",
+    "cause": "s4",
+    "court_name": "s2",
+    "case_type": "docType",
+    "trial_procedure": "spcx",
+    "court_level": "fy",
+    "doc_id": "docId",
+    "publish_date": "s50"
+  },
+  "default_sort": "s50:desc",
+  "default_user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+}

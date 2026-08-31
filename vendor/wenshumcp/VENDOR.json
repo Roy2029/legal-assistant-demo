@@ -1,0 +1,17 @@
+{
+  "name": "wenshumcp",
+  "source_path": "C:\\Users\\Roy\\WorkBuddy\\WenshuMCP",
+  "source_commit": null,
+  "vendored_at": "2026-08-31",
+  "content_fingerprint": "43242a98c90bbb96575fe30fa3e093ff8dea796b4b6afe4ecf20287b16a77eb9",
+  "includes": [
+    "wenshu_mcp",
+    "wenshu_api"
+  ],
+  "excluded": [
+    "__pycache__",
+    "_tmp_dl",
+    "captcha_samples"
+  ],
+  "refresh": "python packaging/vendor_wenshumcp.py"
+}
